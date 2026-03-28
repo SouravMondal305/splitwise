@@ -14,9 +14,7 @@ import org.example.User.User;
 import org.example.User.UserController;
 
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class Splitwise {
 
@@ -78,17 +76,13 @@ public class Splitwise {
         System.out.println("\n📊 Step 4: Create DIRECT Expenses (Peer-to-Peer)...");
         createDirectExpenses();
         
-        // Display all balances
-        System.out.println("\n📊 Step 5: Display User Balance Sheets...");
+        // Display all balances (integrated with direct expenses)
+        System.out.println("\n📊 Step 5: Display User Balance Sheets (Including Direct Expenses)...");
         displayUserBalances();
         
         // Display group settlement
         System.out.println("\n📊 Step 6: Display Group Settlement Summary...");
         displayGroupSettlement();
-        
-        // Display direct expense summaries
-        System.out.println("\n📊 Step 7: Display Direct Expense Settlements...");
-        displayDirectExpenseSettlements();
         
         System.out.println("\n╔════════════════════════════════════════════════════════════════╗");
         System.out.println("║               ✅ END-TO-END DEMO COMPLETED                     ║");
@@ -278,34 +272,24 @@ public class Splitwise {
         System.out.println();
         for (User user : userController.getAllUsers()) {
             balanceSheetController.showBalanceSheetOfUser(user);
+            
+            // Also show direct expenses for this user
+            List<org.example.Expense.Expense> directExpenses = expenseRepository.findAllDirectExpensesForUser(user.getUserId(), userRepository);
+            if (!directExpenses.isEmpty()) {
+                System.out.println("📋 DIRECT EXPENSES (Peer-to-Peer):");
+                for (org.example.Expense.Expense exp : directExpenses) {
+                    System.out.println("  • " + exp.getDescription() + " - Paid by: " + exp.getPaidByUser().getUserName() + " (₹" + exp.getExpenseAmount() + ")");
+                    for (Split split : exp.getSplitDetails()) {
+                        System.out.println("      └─ " + split.getUser().getUserName() + ": ₹" + split.getAmountOwe());
+                    }
+                }
+                System.out.println();
+            }
         }
     }
 
     private void displayGroupSettlement() {
         Group tripGroup = groupController.getGroup("G1001");
         balanceSheetController.showGroupSettlementSummary(tripGroup);
-    }
-
-    private void displayDirectExpenseSettlements() {
-        User alice = userController.getUser("U1001");
-        User diana = userController.getUser("U4001");
-        User eve = userController.getUser("U5001");
-        User bob = userController.getUser("U2001");
-        
-        System.out.println("\n═══════════════════════════════════════════════════════════════");
-        System.out.println("DIRECT EXPENSE SETTLEMENTS");
-        System.out.println("═══════════════════════════════════════════════════════════════");
-        
-        // Settlement between Alice & Diana
-        System.out.println("\n💳 Settlement: Alice & Diana");
-        directExpenseService.showDirectExpenseHistory("U1001", "U4001");
-        
-        // Settlement between Diana & Eve
-        System.out.println("\n💳 Settlement: Diana & Eve");
-        directExpenseService.showDirectExpenseHistory("U4001", "U5001");
-        
-        // Settlement between Bob & Eve
-        System.out.println("\n💳 Settlement: Bob & Eve");
-        directExpenseService.showDirectExpenseHistory("U2001", "U5001");
     }
 }
