@@ -1,6 +1,7 @@
 org/example/Split/SplitStrategies/EqualExpenseSplit.class
 org/example/Main.class
 org/example/User/User.class
+org/example/Controllers/DirectExpenseService.class
 org/example/Split/Split.class
 org/example/Expense/ExpenseType.class
 org/example/Payment/Payment.class
