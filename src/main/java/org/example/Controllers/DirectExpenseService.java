@@ -54,16 +54,17 @@ public class DirectExpenseService {
                                        ExpenseSplitType splitType,
                                        List<Split> splits) {
         
-        // Validate participants
-        if (participantIds.size() < 2 || participantIds.size() > 3) {
-            throw new IllegalArgumentException("Direct expenses must involve 2-3 people. Found: " + participantIds.size());
-        }
-        
         // Ensure paidByUser is in participants
         boolean userIsParticipant = participantIds.stream()
             .anyMatch(id -> id.equals(paidByUser.getUserId()));
         if (!userIsParticipant) {
+            participantIds = new ArrayList<>(participantIds);
             participantIds.add(paidByUser.getUserId());
+        }
+        
+        // Validate participants (after adding payer)
+        if (participantIds.size() < 2 || participantIds.size() > 3) {
+            throw new IllegalArgumentException("Direct expenses must involve 2-3 people. Found: " + participantIds.size());
         }
         
         // Validate all participants exist
