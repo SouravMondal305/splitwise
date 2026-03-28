@@ -72,6 +72,9 @@ public class Splitwise {
         for (User user : userController.getAllUsers()) {
             balanceSheetController.showBalanceSheetOfUser(user);
         }
+
+        // Display combined group settlement summary (total + who pays whom)
+        balanceSheetController.showGroupSettlementSummary(group);
     }
 
     private void setupUsersAndGroup() {

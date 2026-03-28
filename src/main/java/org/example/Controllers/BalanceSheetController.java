@@ -6,10 +6,12 @@ import org.example.User.User;
 import org.example.Balance.UserExpenseBalanceSheet;
 import org.example.Group.Group;
 import org.example.Expense.Expense;
+import org.example.Payment.Payment;
 
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.ArrayList;
 
 
 //✅ Simple logic in steps:
@@ -141,9 +143,224 @@ public class BalanceSheetController {
         System.out.println("=======================================\n");
     }
 
+    /**
+     * Calculates who pays whom in the group using an optimal payment settlement algorithm.
+     * Uses a two-pointer approach with min/max balances to minimize the number of transactions.
+     * 
+     * @param group The group to calculate payments for
+     * @return List of Payment objects representing the settlement transactions
+     */
+    public List<Payment> getGroupPaymentSettlement(Group group) {
+        List<Payment> payments = new ArrayList<>();
+        
+        // Create group-specific balance tracking
+        Map<String, Double> memberBalance = new HashMap<>();
+        Map<String, User> userMap = new HashMap<>();
+        
+        // Initialize all members
+        for (User member : group.getGroupMembers()) {
+            memberBalance.put(member.getUserId(), 0.0);
+            userMap.put(member.getUserId(), member);
+        }
+        
+        // Calculate net balance for each member (positive = owed to them, negative = they owe)
+        for (Expense expense : group.getExpenses()) {
+            double expenseAmount = expense.expenseAmount;
+            User payer = expense.paidByUser;
+            
+            // Decrease payer's balance (they paid more than their share initially)
+            memberBalance.put(payer.getUserId(), memberBalance.get(payer.getUserId()) - expenseAmount);
+            
+            // Add what each person owes from this expense
+            for (Split split : expense.splitDetails) {
+                User owingUser = split.getUser();
+                double amountOwed = split.getAmountOwe();
+                memberBalance.put(owingUser.getUserId(), memberBalance.get(owingUser.getUserId()) + amountOwed);
+            }
+        }
+        
+        // Create lists for debtors (negative balance) and creditors (positive balance)
+        List<Map.Entry<String, Double>> debtors = new ArrayList<>();
+        List<Map.Entry<String, Double>> creditors = new ArrayList<>();
+        
+        final double EPSILON = 1e-9; // For floating point comparison
+        for (Map.Entry<String, Double> entry : memberBalance.entrySet()) {
+            if (entry.getValue() < -EPSILON) {
+                debtors.add(entry);
+            } else if (entry.getValue() > EPSILON) {
+                creditors.add(entry);
+            }
+        }
+        
+        // Sort debtors by amount owed (ascending) and creditors by amount to receive (descending)
+        debtors.sort((a, b) -> Double.compare(a.getValue(), b.getValue()));
+        creditors.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
+        
+        // Match debtors with creditors to create minimal transactions
+        int debtorIdx = 0;
+        int creditorIdx = 0;
+        
+        while (debtorIdx < debtors.size() && creditorIdx < creditors.size()) {
+            String debtorId = debtors.get(debtorIdx).getKey();
+            double debtorAmount = Math.abs(debtors.get(debtorIdx).getValue());
+            
+            String creditorId = creditors.get(creditorIdx).getKey();
+            double creditorAmount = creditors.get(creditorIdx).getValue();
+            
+            User debtor = userMap.get(debtorId);
+            User creditor = userMap.get(creditorId);
+            
+            // Amount to transfer is the minimum of what debtor owes and what creditor is owed
+            double amountToTransfer = Math.min(debtorAmount, creditorAmount);
+            
+            // Create payment
+            payments.add(new Payment(
+                    debtorId, 
+                    debtor.getUserName(),
+                    creditorId,
+                    creditor.getUserName(),
+                    amountToTransfer
+            ));
+            
+            // Update remaining amounts
+            debtorAmount -= amountToTransfer;
+            creditorAmount -= amountToTransfer;
+            
+            // Move to next debtor or creditor
+            if (debtorAmount < EPSILON) {
+                debtorIdx++;
+            } else {
+                debtors.get(debtorIdx).setValue(-debtorAmount);
+            }
+            
+            if (creditorAmount < EPSILON) {
+                creditorIdx++;
+            } else {
+                creditors.get(creditorIdx).setValue(creditorAmount);
+            }
+        }
+        
+        return payments;
+    }
 
+    /**
+     * Display who pays whom in the group with amounts
+     * 
+     * @param group The group to show payment settlement for
+     */
+    public void showGroupPaymentSettlement(Group group) {
+        System.out.println("\n=======================================");
+        System.out.println("WHO PAYS WHOM - GROUP: " + group.getGroupId());
+        System.out.println("=======================================");
+        
+        List<Payment> payments = getGroupPaymentSettlement(group);
+        
+        if (payments.isEmpty()) {
+            System.out.println("All debts are settled!");
+        } else {
+            System.out.println("\nPayment Instructions:");
+            System.out.println(String.format("%-40s | %s", "Transaction", "Amount"));
+            System.out.println("-------------------------------------------------------------");
+            
+            for (Payment payment : payments) {
+                System.out.println(String.format("%-40s | ₹%.2f", 
+                        payment.getPayerName() + " → " + payment.getReceiverName(), 
+                        payment.getAmount()));
+            }
+        }
+        
+        System.out.println("=======================================\n");
+    }
 
+    /**
+     * Display complete group settlement summary with balance sheet and payment instructions
+     * Combines group balance sheet and payment settlement in a single comprehensive view
+     * 
+     * @param group The group to show complete settlement summary for
+     */
+    public void showGroupSettlementSummary(Group group) {
+        System.out.println("\n╔════════════════════════════════════════════════════════════════╗");
+        System.out.println("║           GROUP SETTLEMENT SUMMARY: " + String.format("%-30s", group.getGroupId()) + "║");
+        System.out.println("╚════════════════════════════════════════════════════════════════╝");
 
+        // Create group-specific balance tracking
+        Map<String, Double> memberTotalPaid = new HashMap<>();
+        Map<String, Double> memberTotalOwed = new HashMap<>();
+        Map<String, User> userMap = new HashMap<>();
+        double totalGroupExpense = 0;
+
+        // Initialize all members
+        for (User member : group.getGroupMembers()) {
+            memberTotalPaid.put(member.getUserId(), 0.0);
+            memberTotalOwed.put(member.getUserId(), 0.0);
+            userMap.put(member.getUserId(), member);
+        }
+
+        // Calculate balances from group expenses only
+        for (Expense expense : group.getExpenses()) {
+            double expenseAmount = expense.expenseAmount;
+            User payer = expense.paidByUser;
+            totalGroupExpense += expenseAmount;
+
+            // Payer paid this amount
+            memberTotalPaid.put(payer.getUserId(), memberTotalPaid.get(payer.getUserId()) + expenseAmount);
+
+            // Add what each person owes from this expense
+            for (Split split : expense.splitDetails) {
+                User owingUser = split.getUser();
+                double amountOwed = split.getAmountOwe();
+                memberTotalOwed.put(owingUser.getUserId(), memberTotalOwed.get(owingUser.getUserId()) + amountOwed);
+            }
+        }
+
+        // Display group expense summary
+        System.out.println("\n┌─ EXPENSE SUMMARY ─────────────────────────────────────────────┐");
+        System.out.println("│ Total Group Expense: ₹" + String.format("%-54.2f", totalGroupExpense) + "│");
+        System.out.println("└───────────────────────────────────────────────────────────────┘");
+
+        // Display each member's balance
+        System.out.println("\n┌─ MEMBER BALANCES ─────────────────────────────────────────────┐");
+        System.out.println("│ " + String.format("%-15s %-14s %-14s %-22s", "Member", "Paid", "Their Share", "Balance") + "│");
+        System.out.println("├───────────────────────────────────────────────────────────────┤");
+
+        for (User member : group.getGroupMembers()) {
+            String memberId = member.getUserId();
+            double paid = memberTotalPaid.get(memberId);
+            double owed = memberTotalOwed.get(memberId);
+            double balance = paid - owed;
+
+            String balanceStatus = "";
+            if (balance > 0.001) {
+                balanceStatus = "Gets ₹" + String.format("%.2f", balance);
+            } else if (balance < -0.001) {
+                balanceStatus = "Owes ₹" + String.format("%.2f", Math.abs(balance));
+            } else {
+                balanceStatus = "Settled";
+            }
+
+            System.out.println("│ " + String.format("%-15s ₹%-13.2f ₹%-13.2f %-22s", 
+                    memberId, paid, owed, balanceStatus) + "│");
+        }
+        System.out.println("└───────────────────────────────────────────────────────────────┘");
+
+        // Display payment settlement
+        List<Payment> payments = getGroupPaymentSettlement(group);
+        System.out.println("\n┌─ PAYMENT INSTRUCTIONS ────────────────────────────────────────┐");
+        
+        if (payments.isEmpty()) {
+            System.out.println("│ All debts are settled!                                        │");
+        } else {
+            System.out.println("│ " + String.format("%-63s", "Transaction") + "│");
+            System.out.println("├───────────────────────────────────────────────────────────────┤");
+            
+            for (Payment payment : payments) {
+                String transaction = payment.getPayerName() + " → " + payment.getReceiverName() + 
+                                   " : ₹" + String.format("%.2f", payment.getAmount());
+                System.out.println("│ " + String.format("%-63s", transaction) + "│");
+            }
+        }
+        System.out.println("└───────────────────────────────────────────────────────────────┘\n");
+    }
 }
 
 
