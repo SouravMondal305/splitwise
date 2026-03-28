@@ -29,31 +29,37 @@ The Splitwise database follows a relational model with normalized tables to effi
          │        │ created_at      │  │ joined_at        │  │
          │        └────────┬────────┘  └──────────────────┘  │
          │                 │                                   │
-         │        ┌────────▼──────────────┐                   │
-         │        │     EXPENSES         │                   │
-         │        ├──────────────────────┤                   │
-         │        │ expense_id (PK)      │                   │
-         │        │ group_id (FK)        │                   │
-         │        │ paid_by_user_id (FK) ├───────────────────┘
-         │        │ description          │
-         │        │ amount               │
-         │        │ split_type           │
-         │        │ created_at           │
-         │        └────────┬─────────────┘
-         │                 │
-         │        ┌────────▼──────────────┐
-         │        │ EXPENSE_SPLITS       │
-         │        ├──────────────────────┤
-         │        │ split_id (PK)        │
-         │        │ expense_id (FK)      │
-         │        │ user_id (FK)        ├─────────────┐
-         │        │ amount_owed          │             │
-         │        │ split_percentage     │             │
-         │        └──────────────────────┘             │
-         │                                              │
-         └──────────────────────────────────────────────┘
-         │
-    ┌────▼────────────────┐
+         │      ┌──────────▼──────────────────┐               │
+         │      │     EXPENSES                 │               │
+         │      ├──────────────────────────────┤               │
+         │      │ expense_id (PK)              │               │
+         │      │ group_id (FK, NULLABLE) ◄───┘               │
+         │      │ expense_type (GROUP/DIRECT) │               │
+         │      │ paid_by_user_id (FK) ├───────────────────────┘
+         │      │ description          │
+         │      │ amount               │
+         │      │ split_type           │
+         │      │ created_at           │
+         │      └────────┬─────────────┘
+         │               │
+         │      ┌────────▼──────────────┐
+         │      │ EXPENSE_SPLITS       │
+         │      ├──────────────────────┤
+         │      │ split_id (PK)        │
+         │      │ expense_id (FK)      │
+         │      │ user_id (FK)        ├─────────────┐
+         │      │ amount_owed          │             │
+         │      └──────────────────────┘             │
+         │                                            │
+         └────────────────────────────────────────────┘
+
+Legend:
+─────────────────────────────────
+GROUP Expenses: group_id NOT NULL
+DIRECT Expenses: group_id NULL
+─────────────────────────────────
+
+    ┌─────────────────────┐
     │ USER_BALANCES       │
     ├─────────────────────┤
     │ balance_id (PK)     │
@@ -178,40 +184,84 @@ CREATE TABLE group_members (
 ---
 
 ### 4. EXPENSES
-Stores expense information.
+Stores expense information. Supports TWO types of expenses:
+- **GROUP Expenses**: group_id NOT NULL (expense within a group context)
+- **DIRECT Expenses**: group_id IS NULL (peer-to-peer between individuals)
 
 | Column Name | Data Type | Constraints | Description |
 |-------------|-----------|-------------|-------------|
 | `expense_id` | VARCHAR(50) | PRIMARY KEY, NOT NULL | Unique identifier for expense (e.g., Exp1001) |
-| `group_id` | VARCHAR(50) | FOREIGN KEY (groups), NOT NULL | Reference to group |
+| `group_id` | VARCHAR(50) | FOREIGN KEY (groups), **NULLABLE** | Reference to group (NULL for DIRECT expenses) |
 | `paid_by_user_id` | VARCHAR(50) | FOREIGN KEY (users), NOT NULL | User who paid the expense |
 | `description` | VARCHAR(255) | NOT NULL | Description of expense |
 | `amount` | DECIMAL(10,2) | NOT NULL, CHECK (amount > 0) | Total expense amount |
+| `expense_type` | VARCHAR(50) | NOT NULL | Type: 'GROUP' or 'DIRECT' |
 | `split_type` | ENUM('EQUAL', 'UNEQUAL', 'PERCENTAGE') | NOT NULL | Type of split |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | When expense was created |
 | `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Last update timestamp |
 
 **Indexes:**
 - PRIMARY KEY: `expense_id`
-- FOREIGN KEY: `group_id` → `groups.group_id`
+- FOREIGN KEY: `group_id` → `groups.group_id` (OPTIONAL - can be NULL)
 - FOREIGN KEY: `paid_by_user_id` → `users.user_id`
 - INDEX: `group_id`, `created_at`
+- INDEX: `expense_type`, `paid_by_user_id`
+
+**Check Constraint (Data Integrity):**
+```sql
+CHECK ((group_id IS NOT NULL AND expense_type = 'GROUP') OR 
+       (group_id IS NULL AND expense_type = 'DIRECT'))
+```
+This ensures:
+- If expense_type='GROUP', then group_id must NOT be NULL
+- If expense_type='DIRECT', then group_id must be NULL
+- No mixed states possible
 
 **SQL:**
 ```sql
 CREATE TABLE expenses (
     expense_id VARCHAR(50) PRIMARY KEY,
-    group_id VARCHAR(50) NOT NULL,
+    group_id VARCHAR(50),
     paid_by_user_id VARCHAR(50) NOT NULL,
     description VARCHAR(255) NOT NULL,
     amount DECIMAL(10,2) NOT NULL CHECK (amount > 0),
+    expense_type VARCHAR(50) NOT NULL,
     split_type ENUM('EQUAL', 'UNEQUAL', 'PERCENTAGE') NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (group_id) REFERENCES groups(group_id),
     FOREIGN KEY (paid_by_user_id) REFERENCES users(user_id),
-    INDEX idx_group_created (group_id, created_at)
+    INDEX idx_group_created (group_id, created_at),
+    INDEX idx_expense_type_payer (expense_type, paid_by_user_id),
+    CONSTRAINT check_expense_type CHECK (
+        (group_id IS NOT NULL AND expense_type = 'GROUP') OR 
+        (group_id IS NULL AND expense_type = 'DIRECT')
+    )
 );
+```
+
+**Example Records:**
+
+GROUP Expense:
+```
+expense_id: exp_hotel_001
+group_id: G1001           -- NOT NULL
+paid_by_user_id: U1001
+description: Hotel for 3 nights
+amount: 3000.00
+expense_type: GROUP
+split_type: EQUAL
+```
+
+DIRECT Expense:
+```
+expense_id: dir_movie_001
+group_id: NULL            -- NULLABLE for DIRECT
+paid_by_user_id: U1001
+description: Movie tickets
+amount: 600.00
+expense_type: DIRECT
+split_type: EQUAL
 ```
 
 ---
@@ -344,16 +394,19 @@ CREATE TABLE payments (
 - `GROUP_MEMBERS.user_id` → `USERS.user_id`
 
 ### 3. GROUPS → EXPENSES (One-to-Many)
-- One group has many expenses
-- Relationship: `EXPENSES.group_id` → `GROUPS.group_id`
+- One group has many GROUP expenses (optional relationship)
+- Relationship: `EXPENSES.group_id` → `GROUPS.group_id` (NULLABLE)
+- Only applies to expenses with `expense_type = 'GROUP'`
+- DIRECT expenses have `group_id = NULL`
 
 ### 4. USERS → EXPENSES (One-to-Many)
-- One user can pay for multiple expenses
+- One user can pay for multiple expenses (both GROUP and DIRECT)
 - Relationship: `EXPENSES.paid_by_user_id` → `USERS.user_id`
 
 ### 5. EXPENSES → EXPENSE_SPLITS (One-to-Many)
 - One expense has many splits (one per participant)
 - Relationship: `EXPENSE_SPLITS.expense_id` → `EXPENSES.expense_id`
+- Applies to both GROUP and DIRECT expenses
 
 ### 6. USERS → EXPENSE_SPLITS (One-to-Many)
 - One user has multiple splits across expenses
@@ -374,6 +427,20 @@ CREATE TABLE payments (
 ### 10. USERS → PAYMENTS (Many-to-Many)
 - Users as payers and receivers
 - Relationships: `PAYMENTS.payer_id`, `PAYMENTS.receiver_id` → `USERS.user_id`
+
+### 11. EXPENSES: GROUP vs DIRECT Type Constraint
+- **GROUP Expenses**: 
+  - `group_id NOT NULL` (must reference a group)
+  - `expense_type = 'GROUP'`
+  - Involved users must be group members
+  - Example: Hotel bill split among trip group members
+  
+- **DIRECT Expenses**:
+  - `group_id IS NULL` (no group reference)
+  - `expense_type = 'DIRECT'`
+  - Between 2-3 individual users
+  - Independent of any group
+  - Example: Movie ticket payment between friends
 
 ---
 

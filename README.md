@@ -11,15 +11,29 @@ A Java-based expense splitting application that efficiently calculates and settl
 - **Balance Calculation**: Automatic calculation of who owes whom
 - **Payment Settlement**: Optimized algorithm to determine minimum transactions needed
 
+### Expense Types
+- **GROUP Expenses**: Expenses in a group context (has `group_id`)
+  - Involves multiple group members
+  - Split among all group participants
+  - Example: Hotel booking, Restaurant bill, Tour tickets
+  
+- **DIRECT Expenses**: Peer-to-peer expenses between individuals (group_id is NULL)
+  - Direct settlement between 2-3 users
+  - No group context required
+  - Example: One friend pays for movie tickets, another reimburses
+  - Tracked separately from group expenses
+
 ### Split Types
 - **EQUAL**: Split expense equally among all participants
 - **UNEQUAL**: Split expense with custom amounts for each participant
 - **PERCENTAGE**: Split expense based on percentages
 
 ### Advanced Features
+- **Dual Expense System**: Support for both group and direct peer-to-peer expenses
 - **Minimal Transaction Algorithm**: Uses a two-pointer matching approach to minimize the number of payment transactions
 - **Group Settlement Summary**: Comprehensive view combining expense summary, member balances, and payment instructions
-- **Individual Balance Sheets**: Detailed breakdown of each user's transactions
+- **Direct Expense Tracking**: Independent tracking of peer-to-peer settlements
+- **Individual Balance Sheets**: Detailed breakdown of each user's transactions including group and direct expenses
 
 ## Project Structure
 
@@ -33,11 +47,13 @@ splitwise/
 │   │   └── UserExpenseBalanceSheet.java    # Overall balance sheet for a user
 │   ├── Controllers/
 │   │   ├── BalanceSheetController.java     # Balance and settlement logic
+│   │   ├── DirectExpenseService.java       # Peer-to-peer expense management
 │   │   ├── ExpenseController.java          # Expense management
 │   │   └── GroupController.java            # Group management
 │   ├── Expense/
-│   │   ├── Expense.java                    # Expense model
-│   │   └── ExpenseSplitType.java           # Split type enum
+│   │   ├── Expense.java                    # Expense model (supports GROUP and DIRECT)
+│   │   ├── ExpenseType.java                # Enum: GROUP or DIRECT
+│   │   └── ExpenseSplitType.java           # Split type enum (EQUAL, UNEQUAL, PERCENTAGE)
 │   ├── Group/
 │   │   └── Group.java                      # Group model
 │   ├── Payment/
@@ -307,6 +323,61 @@ The algorithm efficiently matches creditors with debtors to minimize total trans
 
 - Java 16 or higher
 - Maven 3.9.14 or higher
+
+## Database Design
+
+### Expense Table Structure
+
+The `EXPENSES` table supports both GROUP and DIRECT expenses:
+
+```sql
+CREATE TABLE expenses (
+    expense_id VARCHAR(50) PRIMARY KEY,
+    group_id VARCHAR(50),              -- NULL for DIRECT expenses
+    paid_by_user_id VARCHAR(50) NOT NULL,
+    description VARCHAR(255) NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    expense_type VARCHAR(50),          -- 'GROUP' or 'DIRECT'
+    split_type VARCHAR(50) NOT NULL,   -- 'EQUAL', 'UNEQUAL', 'PERCENTAGE'
+    created_at TIMESTAMP,
+    -- Constraint: GROUP expenses must have group_id, DIRECT expenses must have NULL group_id
+    CHECK ((group_id IS NOT NULL AND expense_type = 'GROUP') OR 
+           (group_id IS NULL AND expense_type = 'DIRECT'))
+);
+```
+
+### Key Design Decisions
+
+1. **Nullable group_id Column**: 
+   - For GROUP expenses: `group_id` is NOT NULL (references `groups.group_id`)
+   - For DIRECT expenses: `group_id` is NULL (peer-to-peer settlement)
+   - CHECK constraint ensures consistency: Either both group_id and expense_type='GROUP' or group_id=NULL and expense_type='DIRECT'
+
+2. **Dual Expense Types**:
+   - GROUP: Member-to-member within a group context
+   - DIRECT: Individual-to-individual without group context
+
+3. **Split Strategy**:
+   - Both types use the same `EXPENSE_SPLITS` table
+   - Splits define who owes what for each expense
+
+### Repository Pattern
+
+The `ExpenseRepository` provides separate methods for managing both expense types:
+
+```java
+// Save GROUP expense (group_id NOT NULL)
+public void saveGroupExpense(Expense expense, String groupId) { ... }
+
+// Save DIRECT expense (group_id NULL)
+public void saveDirectExpense(Expense expense) { ... }
+
+// Query GROUP expenses
+public List<Expense> findByGroupId(String groupId, UserRepository userRepo) { ... }
+
+// Query DIRECT expenses between two users
+public List<Expense> findDirectExpensesBetweenUsers(String userId1, String userId2, UserRepository userRepo) { ... }
+```
 
 ## Building
 
