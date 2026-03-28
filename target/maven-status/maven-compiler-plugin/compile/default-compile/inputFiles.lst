@@ -5,9 +5,14 @@
 /Users/souravmondal/Documents/splitwise/src/main/java/org/example/Controllers/GroupController.java
 /Users/souravmondal/Documents/splitwise/src/main/java/org/example/Expense/Expense.java
 /Users/souravmondal/Documents/splitwise/src/main/java/org/example/Expense/ExpenseSplitType.java
+/Users/souravmondal/Documents/splitwise/src/main/java/org/example/Expense/ExpenseType.java
 /Users/souravmondal/Documents/splitwise/src/main/java/org/example/Group/Group.java
 /Users/souravmondal/Documents/splitwise/src/main/java/org/example/Main.java
 /Users/souravmondal/Documents/splitwise/src/main/java/org/example/Payment/Payment.java
+/Users/souravmondal/Documents/splitwise/src/main/java/org/example/Repository/DatabaseConfig.java
+/Users/souravmondal/Documents/splitwise/src/main/java/org/example/Repository/ExpenseRepository.java
+/Users/souravmondal/Documents/splitwise/src/main/java/org/example/Repository/GroupRepository.java
+/Users/souravmondal/Documents/splitwise/src/main/java/org/example/Repository/UserRepository.java
 /Users/souravmondal/Documents/splitwise/src/main/java/org/example/Split/ExpenseSplitStrategy.java
 /Users/souravmondal/Documents/splitwise/src/main/java/org/example/Split/Split.java
 /Users/souravmondal/Documents/splitwise/src/main/java/org/example/Split/SplitStrategies/EqualExpenseSplit.java

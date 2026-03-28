@@ -75,6 +75,7 @@ public class DatabaseConfig {
         );
         
         // Create EXPENSES table
+        // group_id can be NULL for direct peer-to-peer expenses
         conn.createStatement().execute(
             "CREATE TABLE IF NOT EXISTS expenses (" +
             "    expense_id VARCHAR(50) PRIMARY KEY," +
@@ -82,10 +83,13 @@ public class DatabaseConfig {
             "    paid_by_user_id VARCHAR(50) NOT NULL," +
             "    description VARCHAR(255) NOT NULL," +
             "    amount DECIMAL(10,2) NOT NULL," +
+            "    expense_type VARCHAR(50) DEFAULT 'GROUP'," +  // GROUP or DIRECT
             "    split_type VARCHAR(50) NOT NULL," +
             "    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
             "    FOREIGN KEY (group_id) REFERENCES groups(group_id)," +
-            "    FOREIGN KEY (paid_by_user_id) REFERENCES users(user_id)" +
+            "    FOREIGN KEY (paid_by_user_id) REFERENCES users(user_id)," +
+            "    CHECK ((group_id IS NOT NULL AND expense_type = 'GROUP') OR " +
+            "           (group_id IS NULL AND expense_type = 'DIRECT'))" +
             ")"
         );
         

@@ -47,6 +47,10 @@ public class Group {
         this.groupName = groupName;
     }
 
+    public String getGroupName() {
+        return groupName;
+    }
+
     public List<Expense> getExpenses() { // ✅ ADD THIS METHOD
         return expenseList;
     }
