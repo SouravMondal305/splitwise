@@ -103,10 +103,7 @@ public class DirectExpenseService {
         // Save to database
         expenseRepository.saveDirectExpense(expense);
         
-        System.out.println("✅ Direct expense created: " + expenseId);
-        System.out.println("   Between: " + String.join(", ", participantIds));
-        System.out.println("   Paid by: " + paidByUser.getUserName());
-        System.out.println("   Amount: ₹" + amount);
+        // Direct expense created silently
         
         return expense;
     }

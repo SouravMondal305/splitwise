@@ -479,6 +479,68 @@ public class BalanceSheetController {
         }
         System.out.println("═══════════════════════════════════════════════════════════════\n");
     }
+    
+    /**
+     * Display user expense balance sheet in formatted summary style (like GROUP SETTLEMENT SUMMARY)
+     * Shows detailed breakdown of user's financial status
+     */
+    public void showUserExpenseBalanceSummary(User user) {
+        UserExpenseBalanceSheet sheet = user.getUserExpenseBalanceSheet();
+        
+        System.out.println("\n╔════════════════════════════════════════════════════════════════╗");
+        System.out.println("║        USER EXPENSE BALANCE SUMMARY: " + String.format("%-32s", user.getUserName()) + "║");
+        System.out.println("╚════════════════════════════════════════════════════════════════╝");
+        
+        // Overall summary
+        System.out.println("\n┌─ OVERALL BALANCE ─────────────────────────────────────────────┐");
+        System.out.println("│ " + String.format("%-62s", "Total Paid: ₹" + String.format("%.2f", sheet.getTotalPayment())) + "│");
+        System.out.println("│ " + String.format("%-62s", "Total Expense Share: ₹" + String.format("%.2f", sheet.getTotalYourExpense())) + "│");
+        System.out.println("│ " + String.format("%-62s", "Total Get Back: ₹" + String.format("%.2f", sheet.getTotalYouGetBack())) + "│");
+        System.out.println("│ " + String.format("%-62s", "Total You Owe: ₹" + String.format("%.2f", sheet.getTotalYouOwe())) + "│");
+        
+        // Net balance calculation
+        double netBalance = sheet.getTotalPayment() + sheet.getTotalYouGetBack() - sheet.getTotalYourExpense() - sheet.getTotalYouOwe();
+        String netStatus = "";
+        if (netBalance > 0.001) {
+            netStatus = "💰 NET: " + user.getUserName() + " Gets ₹" + String.format("%.2f", netBalance);
+        } else if (netBalance < -0.001) {
+            netStatus = "💳 NET: " + user.getUserName() + " Owes ₹" + String.format("%.2f", Math.abs(netBalance));
+        } else {
+            netStatus = "✅ NET: Settled";
+        }
+        System.out.println("│ " + String.format("%-62s", netStatus) + "│");
+        System.out.println("└───────────────────────────────────────────────────────────────┘");
+        
+        // Per-user breakdown
+        Map<String, Balance> userVsBalance = sheet.getUserVsBalance();
+        if (!userVsBalance.isEmpty()) {
+            System.out.println("\n┌─ PER-USER BREAKDOWN ──────────────────────────────────────────┐");
+            System.out.println("│ " + String.format("%-15s %-15s %-15s %-17s", "User ID", "Gets Back", "Owes", "Net") + "│");
+            System.out.println("├───────────────────────────────────────────────────────────────┤");
+            
+            for (Map.Entry<String, Balance> entry : userVsBalance.entrySet()) {
+                String userId = entry.getKey();
+                Balance balance = entry.getValue();
+                double getBack = balance.getAmountGetBack();
+                double owes = balance.getAmountOwe();
+                double netUserBalance = getBack - owes;
+                
+                String netUserStatus = "";
+                if (netUserBalance > 0.001) {
+                    netUserStatus = "Gets ₹" + String.format("%.2f", netUserBalance);
+                } else if (netUserBalance < -0.001) {
+                    netUserStatus = "Owes ₹" + String.format("%.2f", Math.abs(netUserBalance));
+                } else {
+                    netUserStatus = "Settled";
+                }
+                
+                System.out.println("│ " + String.format("%-15s ₹%-14.2f ₹%-14.2f %-17s", 
+                        userId, getBack, owes, netUserStatus) + "│");
+            }
+            System.out.println("└───────────────────────────────────────────────────────────────┘");
+        }
+        System.out.println();
+    }
 }
 
 

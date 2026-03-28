@@ -28,7 +28,7 @@ public class UserRepository {
             int rowsInserted = stmt.executeUpdate();
             
             if (rowsInserted > 0) {
-                System.out.println("✅ User saved: " + user.getUserId() + " - " + user.getUserName());
+                // User saved silently
             }
         } catch (SQLException e) {
             System.err.println("❌ Error saving user: " + e.getMessage());
@@ -51,7 +51,7 @@ public class UserRepository {
             
             if (rs.next()) {
                 User user = new User(rs.getString("user_id"), rs.getString("user_name"));
-                System.out.println("✅ User fetched: " + userId);
+                // User fetched silently
                 return user;
             }
         } catch (SQLException e) {

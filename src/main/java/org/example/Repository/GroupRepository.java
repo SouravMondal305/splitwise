@@ -27,7 +27,7 @@ public class GroupRepository {
             stmt.setString(3, createdById);
             
             stmt.executeUpdate();
-            System.out.println("✅ Group saved: " + group.getGroupId());
+            // Group saved silently
         } catch (SQLException e) {
             System.err.println("❌ Error saving group: " + e.getMessage());
             throw new RuntimeException("Failed to save group", e);

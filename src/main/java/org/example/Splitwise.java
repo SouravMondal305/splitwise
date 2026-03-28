@@ -60,29 +60,27 @@ public class Splitwise {
         System.out.println("╚════════════════════════════════════════════════════════════════╝\n");
         
         // Initialize database
-        System.out.println("📊 Step 1: Initialize H2 Database...");
         DatabaseConfig.initializeDatabase();
-        System.out.println("✅ Database initialized\n");
         
-        // Register users in memory and database
-        System.out.println("📊 Step 2: Register Users...");
+        // Register users
         registerUsersAndSaveToDb();
         
         // Create and setup GROUP expenses
-        System.out.println("\n📊 Step 3: Create GROUP Expenses (Trip Planning)...");
         createGroupExpenses();
         
         // Create DIRECT peer-to-peer expenses
-        System.out.println("\n📊 Step 4: Create DIRECT Expenses (Peer-to-Peer)...");
         createDirectExpenses();
         
-        // Display all balances (integrated with direct expenses)
-        System.out.println("\n📊 Step 5: Display User Balance Sheets (Including Direct Expenses)...");
-        displayUserBalances();
+        // Display summaries
+        System.out.println("\n╔════════════════════════════════════════════════════════════════╗");
+        System.out.println("║                    EXPENSE BALANCE SUMMARIES                  ║");
+        System.out.println("╚════════════════════════════════════════════════════════════════╝");
         
-        // Display group settlement
-        System.out.println("\n📊 Step 6: Display Group Settlement Summary...");
-        displayGroupSettlement();
+        displayUserBalanceSummaries();
+        
+        displayGroupBalanceSummary();
+        
+        displayGroupExpenseSummary();
         
         System.out.println("\n╔════════════════════════════════════════════════════════════════╗");
         System.out.println("║               ✅ END-TO-END DEMO COMPLETED                     ║");
@@ -104,14 +102,12 @@ public class Splitwise {
         userController.addUser(diana);
         userController.addUser(eve);
         
-        // Save to database
+        // Save to database (silently)
         userRepository.save(alice);
         userRepository.save(bob);
         userRepository.save(charlie);
         userRepository.save(diana);
         userRepository.save(eve);
-        
-        System.out.println("✅ Created 5 users (Alice, Bob, Charlie, Diana, Eve)");
     }
 
     private void createGroupExpenses() {
@@ -127,10 +123,8 @@ public class Splitwise {
         
         // Save to database
         groupRepository.save(tripGroup, "U1001");
-        System.out.println("✅ Group created: Europe Trip 2026 (Alice, Bob, Charlie)");
         
         // Expense 1: Alice paid for hotel
-        System.out.println("\n  Expense 1: Hotel Booking");
         List<Split> hotelSplits = Arrays.asList(
             new Split(alice, 1000),
             new Split(bob, 1000),
@@ -151,10 +145,9 @@ public class Splitwise {
                 alice, "G1001", org.example.Expense.ExpenseType.GROUP, ExpenseSplitType.EQUAL, hotelSplits),
             "G1001"
         );
-        System.out.println("    ✓ Alice paid ₹3000 → Each (Alice, Bob, Charlie) owes ₹1000");
+        System.out.println("✅ Expense added: Hotel - Alice paid ₹3000");
         
         // Expense 2: Bob paid for food
-        System.out.println("\n  Expense 2: Food & Dining");
         List<Split> foodSplits = Arrays.asList(
             new Split(alice, 400),
             new Split(bob, 400),
@@ -174,10 +167,9 @@ public class Splitwise {
                 bob, "G1001", org.example.Expense.ExpenseType.GROUP, ExpenseSplitType.EQUAL, foodSplits),
             "G1001"
         );
-        System.out.println("    ✓ Bob paid ₹1200 → Each (Alice, Bob, Charlie) owes ₹400");
+        System.out.println("✅ Expense added: Food - Bob paid ₹1200");
         
         // Expense 3: Charlie paid for tours
-        System.out.println("\n  Expense 3: Tour Tickets");
         List<Split> tourSplits = Arrays.asList(
             new Split(alice, 500),
             new Split(bob, 600),
@@ -197,7 +189,7 @@ public class Splitwise {
                 charlie, "G1001", org.example.Expense.ExpenseType.GROUP, ExpenseSplitType.UNEQUAL, tourSplits),
             "G1001"
         );
-        System.out.println("    ✓ Charlie paid ₹1700 → Alice ₹500, Bob ₹600, Charlie ₹600");
+        System.out.println("✅ Expense added: Tours - Charlie paid ₹1700");
     }
 
     private void createDirectExpenses() {
@@ -207,7 +199,6 @@ public class Splitwise {
         User bob = userController.getUser("U2001");
         
         // Direct Expense 1: Alice & Diana - Movie tickets
-        System.out.println("\n  Direct Expense 1: Movie Night (Alice & Diana)");
         List<Split> movieSplits = Arrays.asList(
             new Split(alice, 300),
             new Split(diana, 300)
@@ -221,13 +212,12 @@ public class Splitwise {
                 ExpenseSplitType.EQUAL,
                 movieSplits
             );
-            System.out.println("    ✓ Alice paid ₹600 → Alice ₹300, Diana ₹300");
+            System.out.println("✅ Expense added: Movie tickets - Alice paid ₹600");
         } catch (Exception e) {
-            System.err.println("    ✗ Error: " + e.getMessage());
+            System.err.println("❌ Error: " + e.getMessage());
         }
         
         // Direct Expense 2: Diana & Eve & Bob - Dinner
-        System.out.println("\n  Direct Expense 2: Dinner (Diana, Eve & Bob)");
         List<Split> dinnerSplits = Arrays.asList(
             new Split(diana, 250),
             new Split(eve, 250),
@@ -242,13 +232,12 @@ public class Splitwise {
                 ExpenseSplitType.EQUAL,
                 dinnerSplits
             );
-            System.out.println("    ✓ Diana paid ₹750 → Diana ₹250, Eve ₹250, Bob ₹250");
+            System.out.println("✅ Expense added: Dinner - Diana paid ₹750");
         } catch (Exception e) {
-            System.err.println("    ✗ Error: " + e.getMessage());
+            System.err.println("❌ Error: " + e.getMessage());
         }
         
         // Direct Expense 3: Eve & Bob - Unequal split
-        System.out.println("\n  Direct Expense 3: Taxi Share (Eve & Bob - Unequal)");
         List<Split> taxiSplits = Arrays.asList(
             new Split(eve, 200),
             new Split(bob, 100)
@@ -262,34 +251,25 @@ public class Splitwise {
                 ExpenseSplitType.UNEQUAL,
                 taxiSplits
             );
-            System.out.println("    ✓ Eve paid ₹300 → Eve ₹200, Bob ₹100");
+            System.out.println("✅ Expense added: Taxi share - Eve paid ₹300");
         } catch (Exception e) {
-            System.err.println("    ✗ Error: " + e.getMessage());
+            System.err.println("❌ Error: " + e.getMessage());
         }
     }
 
-    private void displayUserBalances() {
-        System.out.println();
+    private void displayUserBalanceSummaries() {
         for (User user : userController.getAllUsers()) {
-            balanceSheetController.showBalanceSheetOfUser(user);
-            
-            // Also show direct expenses for this user
-            List<org.example.Expense.Expense> directExpenses = expenseRepository.findAllDirectExpensesForUser(user.getUserId(), userRepository);
-            if (!directExpenses.isEmpty()) {
-                System.out.println("📋 DIRECT EXPENSES (Peer-to-Peer):");
-                for (org.example.Expense.Expense exp : directExpenses) {
-                    System.out.println("  • " + exp.getDescription() + " - Paid by: " + exp.getPaidByUser().getUserName() + " (₹" + exp.getExpenseAmount() + ")");
-                    for (Split split : exp.getSplitDetails()) {
-                        System.out.println("      └─ " + split.getUser().getUserName() + ": ₹" + split.getAmountOwe());
-                    }
-                }
-                System.out.println();
-            }
+            balanceSheetController.showUserExpenseBalanceSummary(user);
         }
     }
 
-    private void displayGroupSettlement() {
+    private void displayGroupBalanceSummary() {
         Group tripGroup = groupController.getGroup("G1001");
         balanceSheetController.showGroupSettlementSummary(tripGroup);
+    }
+
+    private void displayGroupExpenseSummary() {
+        Group tripGroup = groupController.getGroup("G1001");
+        balanceSheetController.showGroupBalanceSheet(tripGroup);
     }
 }

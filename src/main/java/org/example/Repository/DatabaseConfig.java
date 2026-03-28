@@ -33,7 +33,7 @@ public class DatabaseConfig {
     public static void initializeDatabase() {
         try (Connection conn = getConnection()) {
             createTables(conn);
-            System.out.println("✅ Database initialized successfully");
+            // Database initialized silently
         } catch (SQLException e) {
             throw new RuntimeException("Failed to initialize database", e);
         }

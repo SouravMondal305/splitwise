@@ -31,7 +31,7 @@ public class Group {
             System.out.println("User " + member.getUserName() + " is already a member of the group!");
         } else {
             groupMembers.add(member);
-            System.out.println("User " + member.getUserName() + " added to the group.");
+            // User added to group silently
         }
     }
 

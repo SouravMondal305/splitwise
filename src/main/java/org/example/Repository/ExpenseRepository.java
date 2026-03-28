@@ -49,7 +49,7 @@ public class ExpenseRepository {
                 expenseStmt.setString(7, expense.getSplitType().toString());
                 
                 expenseStmt.executeUpdate();
-                System.out.println("✅ Group expense saved: " + expense.getExpenseId());
+                // Group expense saved silently
             }
             
             // Step 2: Insert splits
@@ -61,7 +61,7 @@ public class ExpenseRepository {
                     splitStmt.addBatch();
                 }
                 splitStmt.executeBatch();
-                System.out.println("✅ " + expense.getSplitDetails().size() + " splits saved");
+                // Splits saved silently
             }
             
             // Commit transaction
@@ -102,7 +102,7 @@ public class ExpenseRepository {
                 expenseStmt.setString(6, expense.getSplitType().toString());
                 
                 expenseStmt.executeUpdate();
-                System.out.println("✅ Direct expense saved: " + expense.getExpenseId());
+                // Direct expense saved silently
             }
             
             // Step 2: Insert splits
@@ -114,7 +114,7 @@ public class ExpenseRepository {
                     splitStmt.addBatch();
                 }
                 splitStmt.executeBatch();
-                System.out.println("✅ " + expense.getSplitDetails().size() + " direct splits saved");
+                // Direct splits saved silently
             }
             
             // Commit transaction
