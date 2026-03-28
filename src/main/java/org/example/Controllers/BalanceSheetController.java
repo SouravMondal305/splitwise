@@ -361,6 +361,124 @@ public class BalanceSheetController {
         }
         System.out.println("└───────────────────────────────────────────────────────────────┘\n");
     }
+
+    /**
+     * Get payment settlement for DIRECT expenses between users
+     * 
+     * Similar to group settlement but for peer-to-peer expenses
+     * 
+     * @param expenses List of direct expenses between two users
+     * @param users Map of all users involved
+     * @return List of minimal payments needed
+     */
+    public List<Payment> getDirectPaymentSettlement(List<Expense> expenses, Map<String, User> users) {
+        final double EPSILON = 1e-9; // For floating point comparison
+        
+        // Calculate net balance for each user
+        Map<String, Double> userBalance = new HashMap<>();
+        
+        for (Expense expense : expenses) {
+            User payer = expense.paidByUser;
+            double totalAmount = expense.expenseAmount;
+            
+            // Initialize user in map if not present
+            userBalance.putIfAbsent(payer.getUserId(), 0.0);
+            
+            // Payer gets money back
+            userBalance.put(payer.getUserId(), userBalance.get(payer.getUserId()) + totalAmount);
+            
+            // Calculate what each person owes
+            for (Split split : expense.splitDetails) {
+                User owingUser = split.getUser();
+                double amountOwed = split.getAmountOwe();
+                
+                userBalance.putIfAbsent(owingUser.getUserId(), 0.0);
+                
+                if (payer.getUserId().equals(owingUser.getUserId())) {
+                    // Payer also owns share, reduce their credit
+                    userBalance.put(owingUser.getUserId(), userBalance.get(owingUser.getUserId()) - amountOwed);
+                } else {
+                    // Other user owes
+                    userBalance.put(owingUser.getUserId(), userBalance.get(owingUser.getUserId()) - amountOwed);
+                }
+            }
+        }
+        
+        // Separate debtors and creditors
+        ArrayList<Map.Entry<String, Double>> debtors = new ArrayList<>();
+        ArrayList<Map.Entry<String, Double>> creditors = new ArrayList<>();
+        
+        for (Map.Entry<String, Double> entry : userBalance.entrySet()) {
+            if (entry.getValue() < -EPSILON) {
+                debtors.add(entry);
+            } else if (entry.getValue() > EPSILON) {
+                creditors.add(entry);
+            }
+        }
+        
+        // Two-pointer algorithm to match payments
+        List<Payment> payments = new ArrayList<>();
+        int debtorIdx = 0;
+        int creditorIdx = 0;
+        
+        while (debtorIdx < debtors.size() && creditorIdx < creditors.size()) {
+            String debtorId = debtors.get(debtorIdx).getKey();
+            double debtorAmount = Math.abs(debtors.get(debtorIdx).getValue());
+            
+            String creditorId = creditors.get(creditorIdx).getKey();
+            double creditorAmount = creditors.get(creditorIdx).getValue();
+            
+            User debtor = users.get(debtorId);
+            User creditor = users.get(creditorId);
+            
+            double amountToTransfer = Math.min(debtorAmount, creditorAmount);
+            
+            payments.add(new Payment(debtorId, debtor.getUserName(), creditorId, 
+                                     creditor.getUserName(), amountToTransfer));
+            
+            debtorAmount -= amountToTransfer;
+            creditorAmount -= amountToTransfer;
+            
+            if (debtorAmount < EPSILON) {
+                debtorIdx++;
+            } else {
+                debtors.get(debtorIdx).setValue(-debtorAmount);
+            }
+            
+            if (creditorAmount < EPSILON) {
+                creditorIdx++;
+            } else {
+                creditors.get(creditorIdx).setValue(creditorAmount);
+            }
+        }
+        
+        return payments;
+    }
+    
+    /**
+     * Display payment settlement for direct expenses
+     * 
+     * @param expenses List of direct expenses
+     * @param users Map of all users involved
+     */
+    public void showDirectPaymentSettlement(List<Expense> expenses, Map<String, User> users) {
+        List<Payment> payments = getDirectPaymentSettlement(expenses, users);
+        
+        System.out.println("\n═══════════════════════════════════════════════════════════════");
+        System.out.println("         DIRECT EXPENSE SETTLEMENT SUMMARY");
+        System.out.println("═══════════════════════════════════════════════════════════════");
+        
+        if (payments.isEmpty()) {
+            System.out.println("✅ All expenses are settled!");
+        } else {
+            System.out.println("\n💸 PAYMENTS TO BE MADE:");
+            for (Payment payment : payments) {
+                System.out.println(String.format("   %s → %s : ₹%.2f",
+                        payment.getPayerName(), payment.getReceiverName(), payment.getAmount()));
+            }
+        }
+        System.out.println("═══════════════════════════════════════════════════════════════\n");
+    }
 }
 
 
