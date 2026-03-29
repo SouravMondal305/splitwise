@@ -6,6 +6,12 @@ public class Main {
 
         // Get Singleton instance
         Splitwise splitwise = Splitwise.getInstance();
+        
+        // Run end-to-end demo
         splitwise.runSplitwiseDemo();
+        
+        // Run debt simplification demo
+        splitwise.runDebtSimplificationDemo();
     }
 }
+

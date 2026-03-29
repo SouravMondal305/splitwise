@@ -3,8 +3,10 @@ package org.example;
 import org.example.Controllers.BalanceSheetController;
 import org.example.Controllers.DirectExpenseService;
 import org.example.Controllers.GroupController;
+import org.example.Controllers.DebtSimplificationService;
 import org.example.Expense.ExpenseSplitType;
 import org.example.Group.Group;
+import org.example.Payment.Payment;
 import org.example.Repository.DatabaseConfig;
 import org.example.Repository.ExpenseRepository;
 import org.example.Repository.GroupRepository;
@@ -13,6 +15,7 @@ import org.example.Split.Split;
 import org.example.User.User;
 import org.example.User.UserController;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -27,6 +30,7 @@ public class Splitwise {
     private final GroupRepository groupRepository;
     private final ExpenseRepository expenseRepository;
     private final DirectExpenseService directExpenseService;
+    private final DebtSimplificationService debtSimplificationService;
 
     // Private constructor to enforce Singleton
     private Splitwise() {
@@ -39,6 +43,7 @@ public class Splitwise {
         groupRepository = new GroupRepository();
         expenseRepository = new ExpenseRepository();
         directExpenseService = new DirectExpenseService(expenseRepository, userRepository);
+        debtSimplificationService = new DebtSimplificationService();
     }
 
     // Public method to get the singleton instance
@@ -264,5 +269,79 @@ public class Splitwise {
     private void displayGroupBalanceSummary() {
         Group tripGroup = groupController.getGroup("G1001");
         balanceSheetController.showGroupSettlementSummary(tripGroup);
+    }
+    
+    /**
+     * Demo: Test debt simplification with circular debts
+     * 
+     * Scenario: A owes B 300, B owes C 300, C owes A 300 (perfect cycle)
+     * Result: All debts should be eliminated
+     */
+    public void runDebtSimplificationDemo() {
+        System.out.println("\n╔════════════════════════════════════════════════════════════════╗");
+        System.out.println("║        DEBT SIMPLIFICATION DEMO - CIRCULAR DEBT DETECTION     ║");
+        System.out.println("╚════════════════════════════════════════════════════════════════╝\n");
+        
+        // Get users from existing data (already created in runSplitwiseDemo)
+        User alice = userController.getUser("U1001");
+        User bob = userController.getUser("U2001");
+        User charlie = userController.getUser("U3001");
+        User diana = userController.getUser("U4001");
+        User eve = userController.getUser("U5001");
+        
+        // Create sample debts for simplification
+        List<Payment> originalDebts = new ArrayList<>();
+        
+        // Test Case 1: Perfect circular debt (A → B → C → A)
+        System.out.println("TEST CASE 1: Perfect Circular Debt");
+        System.out.println("─────────────────────────────────────────────────────────────────");
+        System.out.println("Scenario: Alice owes Bob 300");
+        System.out.println("          Bob owes Charlie 300");
+        System.out.println("          Charlie owes Alice 300\n");
+        
+        originalDebts.clear();
+        originalDebts.add(new Payment("U1001", alice.getUserName(), "U2001", bob.getUserName(), 300));
+        originalDebts.add(new Payment("U2001", bob.getUserName(), "U3001", charlie.getUserName(), 300));
+        originalDebts.add(new Payment("U3001", charlie.getUserName(), "U1001", alice.getUserName(), 300));
+        
+        List<Payment> simplified1 = debtSimplificationService.simplifyDebts(new ArrayList<>(originalDebts));
+        debtSimplificationService.displaySimplification(originalDebts, simplified1);
+        
+        // Test Case 2: Partial circular debt (A → B → C → A with unequal amounts)
+        System.out.println("\nTEST CASE 2: Partial Circular Debt");
+        System.out.println("─────────────────────────────────────────────────────────────────");
+        System.out.println("Scenario: Alice owes Bob 500");
+        System.out.println("          Bob owes Charlie 300");
+        System.out.println("          Charlie owes Alice 300\n");
+        
+        originalDebts.clear();
+        originalDebts.add(new Payment("U1001", alice.getUserName(), "U2001", bob.getUserName(), 500));
+        originalDebts.add(new Payment("U2001", bob.getUserName(), "U3001", charlie.getUserName(), 300));
+        originalDebts.add(new Payment("U3001", charlie.getUserName(), "U1001", alice.getUserName(), 300));
+        
+        List<Payment> simplified2 = debtSimplificationService.simplifyDebts(new ArrayList<>(originalDebts));
+        debtSimplificationService.displaySimplification(originalDebts, simplified2);
+        
+        // Test Case 3: Multiple cycles
+        System.out.println("\nTEST CASE 3: Multiple Cycles");
+        System.out.println("─────────────────────────────────────────────────────────────────");
+        System.out.println("Scenario: Cycle 1 (A → B → C → A): 200 each");
+        System.out.println("          Cycle 2 (D → E → D): 150 each\n");
+        
+        originalDebts.clear();
+        // Cycle 1
+        originalDebts.add(new Payment("U1001", alice.getUserName(), "U2001", bob.getUserName(), 200));
+        originalDebts.add(new Payment("U2001", bob.getUserName(), "U3001", charlie.getUserName(), 200));
+        originalDebts.add(new Payment("U3001", charlie.getUserName(), "U1001", alice.getUserName(), 200));
+        // Cycle 2
+        originalDebts.add(new Payment("U4001", diana.getUserName(), "U5001", eve.getUserName(), 150));
+        originalDebts.add(new Payment("U5001", eve.getUserName(), "U4001", diana.getUserName(), 150));
+        
+        List<Payment> simplified3 = debtSimplificationService.simplifyDebts(new ArrayList<>(originalDebts));
+        debtSimplificationService.displaySimplification(originalDebts, simplified3);
+        
+        System.out.println("\n╔════════════════════════════════════════════════════════════════╗");
+        System.out.println("║               ✅ DEBT SIMPLIFICATION DEMO COMPLETED             ║");
+        System.out.println("╚════════════════════════════════════════════════════════════════╝\n");
     }
 }

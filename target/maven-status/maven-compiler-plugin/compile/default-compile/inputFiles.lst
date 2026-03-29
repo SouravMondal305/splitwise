@@ -1,6 +1,7 @@
 /Users/souravmondal/Documents/splitwise/src/main/java/org/example/Balance/Balance.java
 /Users/souravmondal/Documents/splitwise/src/main/java/org/example/Balance/UserExpenseBalanceSheet.java
 /Users/souravmondal/Documents/splitwise/src/main/java/org/example/Controllers/BalanceSheetController.java
+/Users/souravmondal/Documents/splitwise/src/main/java/org/example/Controllers/DebtSimplificationService.java
 /Users/souravmondal/Documents/splitwise/src/main/java/org/example/Controllers/DirectExpenseService.java
 /Users/souravmondal/Documents/splitwise/src/main/java/org/example/Controllers/ExpenseController.java
 /Users/souravmondal/Documents/splitwise/src/main/java/org/example/Controllers/GroupController.java
