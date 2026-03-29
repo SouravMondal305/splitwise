@@ -285,6 +285,64 @@ No more cycles found → **Complete!**
 **Output:**
 - ✅ All debts settled (100% reduction)
 
+### Test Case 4: Complex Mixed Scenario (With Final Debts) ✅
+
+**Input:**
+```
+Alice → Bob:      ₹500
+Bob → Charlie:    ₹300
+Charlie → Alice:  ₹250
+Diana → Alice:    ₹400
+Diana → Eve:      ₹200
+Eve → Bob:        ₹150
+```
+
+**Step-by-Step Simplification:**
+
+**Iteration 1:** Find cycle `Alice → Bob → Charlie → Alice`
+- Edges: 500, 300, 250
+- Minimum: 250
+- Reduce all by 250:
+  - Alice → Bob: 500 - 250 = 250
+  - Bob → Charlie: 300 - 250 = 50
+  - Charlie → Alice: 250 - 250 = 0 ✓ Eliminated
+
+**After Iteration 1:**
+```
+Alice → Bob:      ₹250 (remaining)
+Bob → Charlie:    ₹50
+Diana → Alice:    ₹400
+Diana → Eve:      ₹200
+Eve → Bob:        ₹150
+```
+
+**Iteration 2:** Find cycle `Diana → Alice → Bob → Eve → Diana` (if path exists)
+- No cycle detected (Eve → Diana doesn't exist)
+
+**Iteration 3:** Check other potential cycles
+- No more cycles found
+
+**Output: Final Simplified Debts**
+```
+Alice → Bob:      ₹250 (STILL OWES)
+Bob → Charlie:    ₹50  (STILL OWES)
+Diana → Alice:    ₹400 (STILL OWES)
+Diana → Eve:      ₹200 (STILL OWES)
+Eve → Bob:        ₹150 (STILL OWES)
+```
+
+**Statistics:**
+- Original Transactions: 6
+- Simplified Transactions: 5
+- Transactions Eliminated: 1 (16.7% reduction)
+- Original Total Debt: ₹1,800
+- Simplified Total Debt: ₹1,050
+- Amount Simplified: ₹750 (41.7% of debt eliminated through circular patterns)
+
+**Key Insight:** Even though cycles are eliminated, not all debts settle completely. This is **realistic** - users still owe money on non-circular parts of the debt graph. The algorithm is smart enough to identify that:
+- ✅ The circular portion (250) gets eliminated
+- ✅ Linear debts (250, 50, 400, 200, 150) remain as settlement obligations
+
 ---
 
 ## Performance Metrics
