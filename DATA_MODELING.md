@@ -1,633 +1,643 @@
-# Data Modeling - Splitwise Database Schema
+# Data Modeling - Splitwise LLD
 
-This document outlines the database schema design for the Splitwise application with tables, columns, relationships, and constraints.
+This document provides comprehensive data modeling information including class hierarchies, entity relationships, and database schema design.
 
-## Overview
-
-The Splitwise database follows a relational model with normalized tables to efficiently manage users, groups, expenses, and payments.
+---
 
 ## Entity Relationship Diagram (ERD)
 
 ```
-┌─────────────────┐
-│     USERS       │
-├─────────────────┤
-│ user_id (PK)    │
-│ user_name       │
-│ email           │
-│ created_at      │
-└────────┬────────┘
-         │
-         ├─────────────────┬──────────────────┬──────────────────┐
-         │                 │                  │                  │
-         │        ┌────────▼─────────┐  ┌────▼──────────────┐  │
-         │        │      GROUPS      │  │  GROUP_MEMBERS    │  │
-         │        ├─────────────────┤  ├──────────────────┤  │
-         │        │ group_id (PK)   │  │ group_member_id   │  │
-         │        │ group_name      │◄─┤ group_id (FK)    │  │
-         │        │ created_by (FK) │  │ user_id (FK)     │  │
-         │        │ created_at      │  │ joined_at        │  │
-         │        └────────┬────────┘  └──────────────────┘  │
-         │                 │                                   │
-         │      ┌──────────▼──────────────────┐               │
-         │      │     EXPENSES                 │               │
-         │      ├──────────────────────────────┤               │
-         │      │ expense_id (PK)              │               │
-         │      │ group_id (FK, NULLABLE) ◄───┘               │
-         │      │ expense_type (GROUP/DIRECT) │               │
-         │      │ paid_by_user_id (FK) ├───────────────────────┘
-         │      │ description          │
-         │      │ amount               │
-         │      │ split_type           │
-         │      │ created_at           │
-         │      └────────┬─────────────┘
-         │               │
-         │      ┌────────▼──────────────┐
-         │      │ EXPENSE_SPLITS       │
-         │      ├──────────────────────┤
-         │      │ split_id (PK)        │
-         │      │ expense_id (FK)      │
-         │      │ user_id (FK)        ├─────────────┐
-         │      │ amount_owed          │             │
-         │      └──────────────────────┘             │
-         │                                            │
-         └────────────────────────────────────────────┘
-
-Legend:
-─────────────────────────────────
-GROUP Expenses: group_id NOT NULL
-DIRECT Expenses: group_id NULL
-─────────────────────────────────
-
-    ┌─────────────────────┐
-    │ USER_BALANCES       │
-    ├─────────────────────┤
-    │ balance_id (PK)     │
-    │ user_id_1 (FK)      │
-    │ user_id_2 (FK)      │
-    │ group_id (FK)       │
-    │ amount_owed         │
-    │ amount_to_receive   │
-    │ last_updated        │
-    └─────────────────────┘
-
-    ┌─────────────────────┐
-    │ PAYMENTS            │
-    ├─────────────────────┤
-    │ payment_id (PK)     │
-    │ payer_id (FK)       │
-    │ receiver_id (FK)    │
-    │ group_id (FK)       │
-    │ amount              │
-    │ status              │
-    │ created_at          │
-    │ settled_at          │
-    └─────────────────────┘
-```
-
-## Table Definitions
-
-### 1. USERS
-Stores user information in the system.
-
-| Column Name | Data Type | Constraints | Description |
-|-------------|-----------|-------------|-------------|
-| `user_id` | VARCHAR(50) | PRIMARY KEY, NOT NULL | Unique identifier for user (e.g., U1001) |
-| `user_name` | VARCHAR(100) | NOT NULL, UNIQUE | User's display name |
-| `email` | VARCHAR(100) | UNIQUE | User's email address |
-| `phone` | VARCHAR(20) | | User's phone number |
-| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Account creation timestamp |
-| `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Last update timestamp |
-
-**Indexes:**
-- PRIMARY KEY: `user_id`
-- UNIQUE: `user_name`, `email`
-
-**SQL:**
-```sql
-CREATE TABLE users (
-    user_id VARCHAR(50) PRIMARY KEY,
-    user_name VARCHAR(100) NOT NULL UNIQUE,
-    email VARCHAR(100) UNIQUE,
-    phone VARCHAR(20),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+┌────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│                              SPLITWISE ENTITIES                            │
+│                                                                             │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌──────────────────┐           ┌───────────────────┐                      │
+│  │      USER        │           │      GROUP        │                      │
+│  ├──────────────────┤           ├───────────────────┤                      │
+│  │ userId (PK)      │           │ groupId (PK)      │                      │
+│  │ userName         │           │ groupName         │                      │
+│  │ balance_sheet    │◄──────────│ createdBy         │                      │
+│  └──────────────────┘           │ members (M:M)     │                      │
+│           │                      │ expenses (1:M)    │                      │
+│           │                      └───────────────────┘                      │
+│           │                             ▲                                   │
+│           │                             │                                   │
+│  ┌────────▼──────────────────────┐     │                                   │
+│  │ USER_EXPENSE_BALANCE_SHEET    │     │                                   │
+│  ├──────────────────────────────┤     │                                   │
+│  │ userId (FK)                   │     │                                   │
+│  │ totalYourExpense              │     │                                   │
+│  │ totalPayment                  │     │                                   │
+│  │ totalYouOwe                   │     │                                   │
+│  │ totalYouGetBack               │     │                                   │
+│  │ userVsBalance (M:1)           │     │                                   │
+│  └───────────────────────────────┘     │                                   │
+│           │                             │                                   │
+│  ┌────────▼──────────────────────┐     │                                   │
+│  │ BALANCE (Pairwise Balance)    │     │                                   │
+│  ├──────────────────────────────┤     │                                   │
+│  │ fromUserId (FK)               │     │                                   │
+│  │ toUserId (FK)                 │     │                                   │
+│  │ amountOwe                     │     │                                   │
+│  │ amountGetBack                 │     │                                   │
+│  └───────────────────────────────┘     │                                   │
+│                                        │                                   │
+│                          ┌─────────────▼──────────────┐                   │
+│                          │      EXPENSE              │                   │
+│                          ├───────────────────────────┤                   │
+│                          │ expenseId (PK)            │                   │
+│                          │ description               │                   │
+│                          │ expenseAmount             │                   │
+│                          │ paidByUser (FK)           │                   │
+│                          │ groupId (FK - nullable)   │                   │
+│                          │ expenseType (GROUP/DIRECT)│                   │
+│                          │ splitType                 │                   │
+│                          │ splitDetails (1:M)        │                   │
+│                          └──────────────┬────────────┘                   │
+│                                         │                                 │
+│                          ┌──────────────▼────────────┐                   │
+│                          │ SPLIT                     │                   │
+│                          ├───────────────────────────┤                   │
+│                          │ expenseId (FK)            │                   │
+│                          │ userId (FK)               │                   │
+│                          │ amountOwe                 │                   │
+│                          └───────────────────────────┘                   │
+│                                         │                                 │
+│                          ┌──────────────▼────────────┐                   │
+│                          │ PAYMENT                   │                   │
+│                          │ (Settlement Transaction) │                   │
+│                          ├───────────────────────────┤                   │
+│                          │ payerId (FK)              │                   │
+│                          │ receiverId (FK)           │                   │
+│                          │ amount                    │                   │
+│                          └───────────────────────────┘                   │
+│                                                                             │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-### 2. GROUPS
-Stores group information.
+## Class Hierarchy & Structure
 
-| Column Name | Data Type | Constraints | Description |
-|-------------|-----------|-------------|-------------|
-| `group_id` | VARCHAR(50) | PRIMARY KEY, NOT NULL | Unique identifier for group (e.g., G1001) |
-| `group_name` | VARCHAR(100) | NOT NULL | Name of the group |
-| `description` | TEXT | | Group description |
-| `created_by` | VARCHAR(50) | FOREIGN KEY (users) | User who created the group |
-| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Group creation timestamp |
-| `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Last update timestamp |
-| `is_active` | BOOLEAN | DEFAULT TRUE | Whether group is active |
+### 1. User Class
 
-**Indexes:**
-- PRIMARY KEY: `group_id`
-- FOREIGN KEY: `created_by` → `users.user_id`
+```java
+public class User {
+    String userId;                          // Unique identifier
+    String userName;                        // User's display name
+    UserExpenseBalanceSheet userExpenseBalanceSheet;  // Personal balance tracker
+    
+    // Constructor
+    public User(String id, String userName)
+    
+    // Getters
+    public String getUserId()
+    public String getUserName()
+    public UserExpenseBalanceSheet getUserExpenseBalanceSheet()
+}
+```
 
-**SQL:**
+**Purpose:** Represents an individual in the system
+**Key Relationships:**
+- 1 User → 1 UserExpenseBalanceSheet (personal balance)
+- 1 User → M Groups (member of groups)
+- 1 User → M Expenses (paid by user)
+- 1 User → M Splits (participant in expense splits)
+
+---
+
+### 2. Group Class
+
+```java
+public class Group {
+    String groupId;                         // Unique group identifier
+    String groupName;                       // Display name
+    List<User> groupMembers;                // Members in group
+    List<Expense> expenseList;              // All expenses in group
+    ExpenseController expenseController;    // For expense operations
+    
+    // Methods
+    public void addMember(User member)
+    public Expense createExpense(String expenseId, String description, 
+                                 double expenseAmount, List<Split> splitDetails,
+                                 ExpenseSplitType splitType, User paidByUser)
+    public List<Expense> getExpenses()
+    public List<User> getGroupMembers()
+}
+```
+
+**Purpose:** Represents a collection of users sharing expenses
+**Key Relationships:**
+- 1 Group → M Users (members)
+- 1 Group → M Expenses (group expenses)
+
+---
+
+### 3. Expense Class
+
+```java
+public class Expense {
+    String expenseId;                       // Unique expense identifier
+    String description;                     // What was the expense for
+    double expenseAmount;                   // Total amount of expense
+    User paidByUser;                        // Who paid
+    String groupId;                         // Group ID (NULL for direct expenses)
+    ExpenseType expenseType;                // GROUP or DIRECT
+    ExpenseSplitType splitType;             // EQUAL, UNEQUAL, PERCENTAGE
+    List<Split> splitDetails;               // How expense is split
+    
+    // Constructors
+    public Expense(String expenseId, double expenseAmount, String description,
+                   User paidByUser, ExpenseSplitType splitType, 
+                   List<Split> splitDetails)
+    
+    public Expense(String expenseId, double expenseAmount, String description,
+                   User paidByUser, String groupId, ExpenseType expenseType,
+                   ExpenseSplitType splitType, List<Split> splitDetails)
+    
+    // Methods
+    public boolean isDirectExpense()        // groupId == null
+    public boolean isGroupExpense()         // groupId != null
+    public List<Split> getSplitDetails()
+}
+```
+
+**Enum: ExpenseType**
+```java
+public enum ExpenseType {
+    GROUP,   // Expense in group context
+    DIRECT   // Peer-to-peer direct expense
+}
+```
+
+**Enum: ExpenseSplitType**
+```java
+public enum ExpenseSplitType {
+    EQUAL,       // Equal division among participants
+    UNEQUAL,     // Custom amounts for each participant
+    PERCENTAGE   // Percentage-based division
+}
+```
+
+**Purpose:** Represents a transaction/expense
+**Key Relationships:**
+- 1 Expense → 1 User (paidByUser)
+- 1 Expense → 1 Group (nullable, for group expenses)
+- 1 Expense → M Splits (how it's divided)
+
+---
+
+### 4. Split Class
+
+```java
+public class Split {
+    User user;                              // Participant in split
+    double amountOwe;                       // Amount this user owes
+    
+    // Constructor
+    public Split(User user, double amountOwe)
+    
+    // Getters/Setters
+    public User getUser()
+    public double getAmountOwe()
+    public void setAmountOwe(double amountOwe)
+}
+```
+
+**Purpose:** Represents individual portion of an expense split
+**Key Relationships:**
+- M Split → 1 Expense (multiple splits per expense)
+- 1 Split → 1 User (split belongs to one user)
+
+---
+
+### 5. Balance Class
+
+```java
+public class Balance {
+    double amountOwe;                       // Amount user owes to another
+    double amountGetBack;                   // Amount user should get back
+    
+    // Getters/Setters
+    public double getAmountOwe()
+    public void setAmountOwe(double amountOwe)
+    public double getAmountGetBack()
+    public void setAmountGetBack(double amountGetBack)
+}
+```
+
+**Purpose:** Tracks pairwise balance between two users
+**Key Relationships:**
+- M Balance → 1 User (user maintains balances with multiple users)
+
+---
+
+### 6. UserExpenseBalanceSheet Class
+
+```java
+public class UserExpenseBalanceSheet {
+    Map<String, Balance> userVsBalance;     // Balance with each user
+    double totalYourExpense;                // Total expense this user was part of
+    double totalPayment;                    // Total amount user paid
+    double totalYouOwe;                     // Total amount user owes to others
+    double totalYouGetBack;                 // Total amount others owe to user
+    
+    // Constructor
+    public UserExpenseBalanceSheet()
+    
+    // Getters/Setters
+    public Map<String, Balance> getUserVsBalance()
+    public double getTotalYourExpense()
+    public double getTotalYouOwe()
+    public double getTotalYouGetBack()
+    public double getTotalPayment()
+}
+```
+
+**Purpose:** Personal balance sheet for each user
+**Key Data:**
+- Total expenses participated in
+- Total amount paid
+- Total owe vs get back
+- Pairwise balance with each other user
+
+---
+
+### 7. Payment Class
+
+```java
+public class Payment {
+    String payerId;                         // User who needs to pay
+    String payerName;
+    String receiverId;                      // User who receives payment
+    String receiverName;
+    double amount;                          // Amount to be paid
+    
+    // Constructor
+    public Payment(String payerId, String payerName, String receiverId,
+                   String receiverName, double amount)
+    
+    // Getters
+    public String getPayerId()
+    public String getPayerName()
+    public String getReceiverId()
+    public String getReceiverName()
+    public double getAmount()
+}
+```
+
+**Purpose:** Represents a settlement transaction (final payment needed)
+**Note:** This is the OUTPUT of debt simplification, not stored in DB
+
+---
+
+## Database Schema (H2)
+
+### Table: USERS
 ```sql
-CREATE TABLE groups (
+CREATE TABLE USERS (
+    user_id VARCHAR(50) PRIMARY KEY,
+    user_name VARCHAR(100) NOT NULL
+);
+```
+
+### Table: GROUPS
+```sql
+CREATE TABLE GROUPS (
     group_id VARCHAR(50) PRIMARY KEY,
     group_name VARCHAR(100) NOT NULL,
-    description TEXT,
     created_by VARCHAR(50) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    is_active BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (created_by) REFERENCES users(user_id)
+    FOREIGN KEY (created_by) REFERENCES USERS(user_id)
 );
 ```
 
----
-
-### 3. GROUP_MEMBERS
-Stores group membership information.
-
-| Column Name | Data Type | Constraints | Description |
-|-------------|-----------|-------------|-------------|
-| `group_member_id` | INT | PRIMARY KEY, AUTO_INCREMENT | Unique identifier for group member record |
-| `group_id` | VARCHAR(50) | FOREIGN KEY (groups), NOT NULL | Reference to group |
-| `user_id` | VARCHAR(50) | FOREIGN KEY (users), NOT NULL | Reference to user |
-| `joined_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | When user joined the group |
-| `is_active` | BOOLEAN | DEFAULT TRUE | Whether member is active in group |
-
-**Indexes:**
-- PRIMARY KEY: `group_member_id`
-- FOREIGN KEY: `group_id` → `groups.group_id`
-- FOREIGN KEY: `user_id` → `users.user_id`
-- UNIQUE: (`group_id`, `user_id`)
-
-**SQL:**
+### Table: GROUP_MEMBERS
 ```sql
-CREATE TABLE group_members (
-    group_member_id INT PRIMARY KEY AUTO_INCREMENT,
+CREATE TABLE GROUP_MEMBERS (
     group_id VARCHAR(50) NOT NULL,
     user_id VARCHAR(50) NOT NULL,
-    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_active BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (group_id) REFERENCES groups(group_id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id),
-    UNIQUE KEY unique_group_member (group_id, user_id)
+    PRIMARY KEY (group_id, user_id),
+    FOREIGN KEY (group_id) REFERENCES GROUPS(group_id),
+    FOREIGN KEY (user_id) REFERENCES USERS(user_id)
 );
 ```
 
----
-
-### 4. EXPENSES
-Stores expense information. Supports TWO types of expenses:
-- **GROUP Expenses**: group_id NOT NULL (expense within a group context)
-- **DIRECT Expenses**: group_id IS NULL (peer-to-peer between individuals)
-
-| Column Name | Data Type | Constraints | Description |
-|-------------|-----------|-------------|-------------|
-| `expense_id` | VARCHAR(50) | PRIMARY KEY, NOT NULL | Unique identifier for expense (e.g., Exp1001) |
-| `group_id` | VARCHAR(50) | FOREIGN KEY (groups), **NULLABLE** | Reference to group (NULL for DIRECT expenses) |
-| `paid_by_user_id` | VARCHAR(50) | FOREIGN KEY (users), NOT NULL | User who paid the expense |
-| `description` | VARCHAR(255) | NOT NULL | Description of expense |
-| `amount` | DECIMAL(10,2) | NOT NULL, CHECK (amount > 0) | Total expense amount |
-| `expense_type` | VARCHAR(50) | NOT NULL | Type: 'GROUP' or 'DIRECT' |
-| `split_type` | ENUM('EQUAL', 'UNEQUAL', 'PERCENTAGE') | NOT NULL | Type of split |
-| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | When expense was created |
-| `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Last update timestamp |
-
-**Indexes:**
-- PRIMARY KEY: `expense_id`
-- FOREIGN KEY: `group_id` → `groups.group_id` (OPTIONAL - can be NULL)
-- FOREIGN KEY: `paid_by_user_id` → `users.user_id`
-- INDEX: `group_id`, `created_at`
-- INDEX: `expense_type`, `paid_by_user_id`
-
-**Check Constraint (Data Integrity):**
+### Table: EXPENSES
 ```sql
-CHECK ((group_id IS NOT NULL AND expense_type = 'GROUP') OR 
-       (group_id IS NULL AND expense_type = 'DIRECT'))
-```
-This ensures:
-- If expense_type='GROUP', then group_id must NOT be NULL
-- If expense_type='DIRECT', then group_id must be NULL
-- No mixed states possible
-
-**SQL:**
-```sql
-CREATE TABLE expenses (
+CREATE TABLE EXPENSES (
     expense_id VARCHAR(50) PRIMARY KEY,
+    description VARCHAR(500),
+    expense_amount DOUBLE NOT NULL,
+    paid_by_user VARCHAR(50) NOT NULL,
     group_id VARCHAR(50),
-    paid_by_user_id VARCHAR(50) NOT NULL,
-    description VARCHAR(255) NOT NULL,
-    amount DECIMAL(10,2) NOT NULL CHECK (amount > 0),
-    expense_type VARCHAR(50) NOT NULL,
-    split_type ENUM('EQUAL', 'UNEQUAL', 'PERCENTAGE') NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (group_id) REFERENCES groups(group_id),
-    FOREIGN KEY (paid_by_user_id) REFERENCES users(user_id),
-    INDEX idx_group_created (group_id, created_at),
-    INDEX idx_expense_type_payer (expense_type, paid_by_user_id),
-    CONSTRAINT check_expense_type CHECK (
-        (group_id IS NOT NULL AND expense_type = 'GROUP') OR 
-        (group_id IS NULL AND expense_type = 'DIRECT')
-    )
+    expense_type VARCHAR(20) NOT NULL,  -- 'GROUP' or 'DIRECT'
+    split_type VARCHAR(20) NOT NULL,    -- 'EQUAL', 'UNEQUAL', 'PERCENTAGE'
+    FOREIGN KEY (paid_by_user) REFERENCES USERS(user_id),
+    FOREIGN KEY (group_id) REFERENCES GROUPS(group_id)
 );
 ```
 
-**Example Records:**
-
-GROUP Expense:
-```
-expense_id: exp_hotel_001
-group_id: G1001           -- NOT NULL
-paid_by_user_id: U1001
-description: Hotel for 3 nights
-amount: 3000.00
-expense_type: GROUP
-split_type: EQUAL
-```
-
-DIRECT Expense:
-```
-expense_id: dir_movie_001
-group_id: NULL            -- NULLABLE for DIRECT
-paid_by_user_id: U1001
-description: Movie tickets
-amount: 600.00
-expense_type: DIRECT
-split_type: EQUAL
-```
-
----
-
-### 5. EXPENSE_SPLITS
-Stores individual split details for each expense.
-
-| Column Name | Data Type | Constraints | Description |
-|-------------|-----------|-------------|-------------|
-| `split_id` | INT | PRIMARY KEY, AUTO_INCREMENT | Unique identifier for split |
-| `expense_id` | VARCHAR(50) | FOREIGN KEY (expenses), NOT NULL | Reference to expense |
-| `user_id` | VARCHAR(50) | FOREIGN KEY (users), NOT NULL | User for this split |
-| `amount_owed` | DECIMAL(10,2) | NOT NULL, CHECK (amount_owed >= 0) | Amount this user owes |
-| `split_percentage` | DECIMAL(5,2) | CHECK (split_percentage >= 0 AND split_percentage <= 100) | Percentage split (if applicable) |
-| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Creation timestamp |
-
-**Indexes:**
-- PRIMARY KEY: `split_id`
-- FOREIGN KEY: `expense_id` → `expenses.expense_id`
-- FOREIGN KEY: `user_id` → `users.user_id`
-- UNIQUE: (`expense_id`, `user_id`)
-
-**SQL:**
+### Table: SPLITS
 ```sql
-CREATE TABLE expense_splits (
-    split_id INT PRIMARY KEY AUTO_INCREMENT,
+CREATE TABLE SPLITS (
+    id INT AUTO_INCREMENT PRIMARY KEY,
     expense_id VARCHAR(50) NOT NULL,
     user_id VARCHAR(50) NOT NULL,
-    amount_owed DECIMAL(10,2) NOT NULL CHECK (amount_owed >= 0),
-    split_percentage DECIMAL(5,2) CHECK (split_percentage >= 0 AND split_percentage <= 100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (expense_id) REFERENCES expenses(expense_id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id),
-    UNIQUE KEY unique_expense_split (expense_id, user_id)
+    amount_owe DOUBLE NOT NULL,
+    FOREIGN KEY (expense_id) REFERENCES EXPENSES(expense_id),
+    FOREIGN KEY (user_id) REFERENCES USERS(user_id)
+);
+```
+
+### Table: BALANCE_SHEETS
+```sql
+CREATE TABLE BALANCE_SHEETS (
+    user_id VARCHAR(50) PRIMARY KEY,
+    total_your_expense DOUBLE,
+    total_payment DOUBLE,
+    total_you_owe DOUBLE,
+    total_you_get_back DOUBLE,
+    FOREIGN KEY (user_id) REFERENCES USERS(user_id)
+);
+```
+
+### Table: BALANCES
+```sql
+CREATE TABLE BALANCES (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL,
+    other_user_id VARCHAR(50) NOT NULL,
+    amount_owe DOUBLE,
+    amount_get_back DOUBLE,
+    FOREIGN KEY (user_id) REFERENCES USERS(user_id),
+    FOREIGN KEY (other_user_id) REFERENCES USERS(user_id)
 );
 ```
 
 ---
 
-### 6. USER_BALANCES
-Stores calculated balance between pairs of users (denormalized for performance).
+## Class Diagram in Text Format
 
-| Column Name | Data Type | Constraints | Description |
-|-------------|-----------|-------------|-------------|
-| `balance_id` | INT | PRIMARY KEY, AUTO_INCREMENT | Unique identifier |
-| `user_id_1` | VARCHAR(50) | FOREIGN KEY (users), NOT NULL | First user |
-| `user_id_2` | VARCHAR(50) | FOREIGN KEY (users), NOT NULL | Second user |
-| `group_id` | VARCHAR(50) | FOREIGN KEY (groups), NOT NULL | Reference to group |
-| `amount_owed` | DECIMAL(10,2) | NOT NULL, DEFAULT 0 | Amount user_id_1 owes to user_id_2 |
-| `amount_to_receive` | DECIMAL(10,2) | NOT NULL, DEFAULT 0 | Amount user_id_1 will receive from user_id_2 |
-| `last_updated` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Last calculation timestamp |
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                         SPLITWISE SYSTEM                           │
+└────────────────────────────────────────────────────────────────────┘
 
-**Indexes:**
-- PRIMARY KEY: `balance_id`
-- FOREIGN KEY: `user_id_1`, `user_id_2` → `users.user_id`
-- FOREIGN KEY: `group_id` → `groups.group_id`
-- UNIQUE: (`group_id`, `user_id_1`, `user_id_2`)
+┌──────────────────────┐
+│      User            │
+├──────────────────────┤
+│ - userId: String     │
+│ - userName: String   │
+│ - balanceSheet       │
+├──────────────────────┤
+│ + getUserId()        │
+│ + getUserName()      │
+│ + getBalanceSheet()  │
+└──────────────────────┘
+         ▲
+         │ 1...*
+         │
+         │
+┌────────┴─────────────────────┐
+│      UserController          │
+├──────────────────────────────┤
+│ - users: List<User>          │
+├──────────────────────────────┤
+│ + addUser(User)              │
+│ + getUser(userId)            │
+│ + getAllUsers()              │
+└──────────────────────────────┘
 
-**SQL:**
-```sql
-CREATE TABLE user_balances (
-    balance_id INT PRIMARY KEY AUTO_INCREMENT,
-    user_id_1 VARCHAR(50) NOT NULL,
-    user_id_2 VARCHAR(50) NOT NULL,
-    group_id VARCHAR(50) NOT NULL,
-    amount_owed DECIMAL(10,2) NOT NULL DEFAULT 0,
-    amount_to_receive DECIMAL(10,2) NOT NULL DEFAULT 0,
-    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id_1) REFERENCES users(user_id),
-    FOREIGN KEY (user_id_2) REFERENCES users(user_id),
-    FOREIGN KEY (group_id) REFERENCES groups(group_id),
-    UNIQUE KEY unique_group_user_pair (group_id, user_id_1, user_id_2)
-);
+
+┌──────────────────────┐
+│      Group           │
+├──────────────────────┤
+│ - groupId: String    │
+│ - groupName: String  │
+│ - members: List      │
+│ - expenses: List     │
+├──────────────────────┤
+│ + addMember()        │
+│ + createExpense()    │
+│ + getGroupMembers()  │
+└──────────────────────┘
+         │ 1...*
+         │ expenses
+         │
+         ▼
+┌──────────────────────────────────┐
+│      Expense                     │
+├──────────────────────────────────┤
+│ - expenseId: String              │
+│ - description: String            │
+│ - expenseAmount: Double          │
+│ - paidByUser: User               │
+│ - groupId: String (nullable)     │
+│ - expenseType: ExpenseType       │
+│ - splitType: ExpenseSplitType    │
+│ - splitDetails: List<Split>      │
+├──────────────────────────────────┤
+│ + isDirectExpense()              │
+│ + isGroupExpense()               │
+│ + getSplitDetails()              │
+└──────────────────────────────────┘
+         │ 1...*
+         │ splitDetails
+         │
+         ▼
+┌──────────────────────┐
+│      Split           │
+├──────────────────────┤
+│ - user: User         │
+│ - amountOwe: Double  │
+├──────────────────────┤
+│ + getUser()          │
+│ + getAmountOwe()     │
+└──────────────────────┘
+
+
+┌─────────────────────────────────────────┐
+│  UserExpenseBalanceSheet                │
+├─────────────────────────────────────────┤
+│ - userVsBalance: Map<String, Balance>   │
+│ - totalYourExpense: Double              │
+│ - totalPayment: Double                  │
+│ - totalYouOwe: Double                   │
+│ - totalYouGetBack: Double               │
+├─────────────────────────────────────────┤
+│ + getUserVsBalance()                    │
+│ + getTotalYourExpense()                 │
+│ + getTotalYouOwe()                      │
+│ + getTotalYouGetBack()                  │
+└─────────────────────────────────────────┘
+         │ 1...*
+         │ balances
+         │
+         ▼
+┌──────────────────────┐
+│      Balance         │
+├──────────────────────┤
+│ - amountOwe: Double  │
+│ - amountGetBack      │
+│   : Double           │
+├──────────────────────┤
+│ + getAmountOwe()     │
+│ + getAmountGetBack() │
+└──────────────────────┘
+
+
+┌──────────────────────────────────────┐
+│    ExpenseController                 │
+├──────────────────────────────────────┤
+│ - balanceSheetController             │
+├──────────────────────────────────────┤
+│ + createExpense(...)                 │
+└──────────────────────────────────────┘
+
+
+┌───────────────────────────────────────┐
+│  BalanceSheetController               │
+├───────────────────────────────────────┤
+│ + updateUserExpenseBalanceSheet(...)  │
+│ + showBalanceSheetOfUser(...)         │
+│ + showGroupBalanceSheet(...)          │
+└───────────────────────────────────────┘
+
+
+┌──────────────────────────────────────┐
+│   DirectExpenseService               │
+├──────────────────────────────────────┤
+│ - expenseRepository                  │
+│ - userRepository                     │
+├──────────────────────────────────────┤
+│ + createDirectExpense(...)           │
+│ + settlePayment(...)                 │
+│ + getBalanceBetweenUsers(...)        │
+└──────────────────────────────────────┘
+
+
+┌──────────────────────────────────────┐
+│  DebtSimplificationService           │
+├──────────────────────────────────────┤
+│ + simplifyDebts(payments)            │
+│ - buildDebtGraph(payments)           │
+│ - eliminateCycle(graph)              │
+│ - dfsForCycle(...)                   │
+│ - eliminateCycleFromPath(...)        │
+│ + displaySimplification(...)         │
+└──────────────────────────────────────┘
+
 ```
 
 ---
 
-### 7. PAYMENTS
-Stores payment settlement transactions.
+## Data Flow Example
 
-| Column Name | Data Type | Constraints | Description |
-|-------------|-----------|-------------|-------------|
-| `payment_id` | INT | PRIMARY KEY, AUTO_INCREMENT | Unique identifier |
-| `payer_id` | VARCHAR(50) | FOREIGN KEY (users), NOT NULL | User making payment |
-| `receiver_id` | VARCHAR(50) | FOREIGN KEY (users), NOT NULL | User receiving payment |
-| `group_id` | VARCHAR(50) | FOREIGN KEY (groups), NOT NULL | Reference to group |
-| `amount` | DECIMAL(10,2) | NOT NULL, CHECK (amount > 0) | Payment amount |
-| `status` | ENUM('PENDING', 'COMPLETED', 'CANCELLED') | DEFAULT 'PENDING' | Payment status |
-| `description` | VARCHAR(255) | | Payment description |
-| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | When payment was recorded |
-| `settled_at` | TIMESTAMP | | When payment was settled |
+### Scenario: Create Group Expense
 
-**Indexes:**
-- PRIMARY KEY: `payment_id`
-- FOREIGN KEY: `payer_id`, `receiver_id` → `users.user_id`
-- FOREIGN KEY: `group_id` → `groups.group_id`
-- INDEX: `status`, `created_at`
+```
+User Alice pays ₹1000 for lunch
+Bob and Charlie each owe ₹500
 
-**SQL:**
-```sql
-CREATE TABLE payments (
-    payment_id INT PRIMARY KEY AUTO_INCREMENT,
-    payer_id VARCHAR(50) NOT NULL,
-    receiver_id VARCHAR(50) NOT NULL,
-    group_id VARCHAR(50) NOT NULL,
-    amount DECIMAL(10,2) NOT NULL CHECK (amount > 0),
-    status ENUM('PENDING', 'COMPLETED', 'CANCELLED') DEFAULT 'PENDING',
-    description VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    settled_at TIMESTAMP NULL,
-    FOREIGN KEY (payer_id) REFERENCES users(user_id),
-    FOREIGN KEY (receiver_id) REFERENCES users(user_id),
-    FOREIGN KEY (group_id) REFERENCES groups(group_id),
-    INDEX idx_status_created (status, created_at)
-);
+Step 1: Input Data
+┌─────────────────────┐
+│ Payer: Alice        │
+│ Amount: 1000        │
+│ Participants: B, C  │
+│ Split: EQUAL        │
+└─────────────────────┘
+           │
+           ▼
+Step 2: Create Splits
+┌─────────────────────────────┐
+│ Split 1: Bob - 500          │
+│ Split 2: Charlie - 500      │
+└─────────────────────────────┘
+           │
+           ▼
+Step 3: Create Expense Object
+┌──────────────────────────────┐
+│ Expense {                     │
+│   expenseId: "exp_001"        │
+│   paidByUser: Alice           │
+│   amount: 1000                │
+│   splits: [Bob: 500, Ch: 500] │
+│   splitType: EQUAL            │
+│ }                             │
+└──────────────────────────────┘
+           │
+           ▼
+Step 4: Update Balance Sheets
+┌─────────────────────────────────────┐
+│ Alice's Sheet:                       │
+│  - totalPayment += 1000              │
+│  - totalYouGetBack += 1000           │
+│  - Balance[Bob].getBack += 500       │
+│  - Balance[Charlie].getBack += 500   │
+├─────────────────────────────────────┤
+│ Bob's Sheet:                         │
+│  - totalYouOwe += 500                │
+│  - totalExpense += 500               │
+│  - Balance[Alice].owe += 500         │
+├─────────────────────────────────────┤
+│ Charlie's Sheet:                     │
+│  - totalYouOwe += 500                │
+│  - totalExpense += 500               │
+│  - Balance[Alice].owe += 500         │
+└─────────────────────────────────────┘
+           │
+           ▼
+Step 5: Store in Repository
+┌──────────────────────────┐
+│ Save to H2 Database      │
+│ - Create EXPENSE row     │
+│ - Create SPLIT rows      │
+│ - Update BALANCE_SHEETS  │
+│ - Update BALANCES        │
+└──────────────────────────┘
 ```
 
 ---
 
-## Relationships
+## Relationships Summary
 
-### 1. USERS → GROUPS (One-to-Many)
-- One user can create multiple groups
-- Relationship: `USERS.user_id` → `GROUPS.created_by`
-
-### 2. GROUPS ↔ USERS (Many-to-Many)
-- Groups have many members, users belong to many groups
-- Relationship: `GROUP_MEMBERS` junction table
-- `GROUP_MEMBERS.group_id` → `GROUPS.group_id`
-- `GROUP_MEMBERS.user_id` → `USERS.user_id`
-
-### 3. GROUPS → EXPENSES (One-to-Many)
-- One group has many GROUP expenses (optional relationship)
-- Relationship: `EXPENSES.group_id` → `GROUPS.group_id` (NULLABLE)
-- Only applies to expenses with `expense_type = 'GROUP'`
-- DIRECT expenses have `group_id = NULL`
-
-### 4. USERS → EXPENSES (One-to-Many)
-- One user can pay for multiple expenses (both GROUP and DIRECT)
-- Relationship: `EXPENSES.paid_by_user_id` → `USERS.user_id`
-
-### 5. EXPENSES → EXPENSE_SPLITS (One-to-Many)
-- One expense has many splits (one per participant)
-- Relationship: `EXPENSE_SPLITS.expense_id` → `EXPENSES.expense_id`
-- Applies to both GROUP and DIRECT expenses
-
-### 6. USERS → EXPENSE_SPLITS (One-to-Many)
-- One user has multiple splits across expenses
-- Relationship: `EXPENSE_SPLITS.user_id` → `USERS.user_id`
-
-### 7. GROUPS → USER_BALANCES (One-to-Many)
-- One group has many user balances
-- Relationship: `USER_BALANCES.group_id` → `GROUPS.group_id`
-
-### 8. USERS → USER_BALANCES (Many-to-Many)
-- Tracks pairwise balances between users
-- Relationships: `USER_BALANCES.user_id_1`, `USER_BALANCES.user_id_2` → `USERS.user_id`
-
-### 9. GROUPS → PAYMENTS (One-to-Many)
-- One group has many payment settlements
-- Relationship: `PAYMENTS.group_id` → `GROUPS.group_id`
-
-### 10. USERS → PAYMENTS (Many-to-Many)
-- Users as payers and receivers
-- Relationships: `PAYMENTS.payer_id`, `PAYMENTS.receiver_id` → `USERS.user_id`
-
-### 11. EXPENSES: GROUP vs DIRECT Type Constraint
-- **GROUP Expenses**: 
-  - `group_id NOT NULL` (must reference a group)
-  - `expense_type = 'GROUP'`
-  - Involved users must be group members
-  - Example: Hotel bill split among trip group members
-  
-- **DIRECT Expenses**:
-  - `group_id IS NULL` (no group reference)
-  - `expense_type = 'DIRECT'`
-  - Between 2-3 individual users
-  - Independent of any group
-  - Example: Movie ticket payment between friends
+| From | To | Cardinality | Type |
+|------|----|----|------|
+| User | UserExpenseBalanceSheet | 1:1 | Composition |
+| User | Balance | 1:M | Association |
+| User | Expense | 1:M | Association (paidBy) |
+| User | Split | 1:M | Association |
+| Group | User | M:M | Association |
+| Group | Expense | 1:M | Composition |
+| Expense | Split | 1:M | Composition |
+| Expense | User | M:1 | Association (paidBy) |
 
 ---
 
-## Constraints and Rules
+## Key Design Considerations
 
-### Primary Key Constraints
-- All `*_id` PRIMARY KEY fields are immutable and unique
-- Auto-increment fields for junction tables
+1. **Nullable GroupId in Expense**
+   - Allows both group and direct expenses
+   - GROUP expenses: groupId != null
+   - DIRECT expenses: groupId = null
 
-### Foreign Key Constraints
-- All foreign keys reference valid primary keys
-- Cascading deletes should be handled carefully (users cannot be deleted if they have active transactions)
-- Cascading updates ensure referential integrity
+2. **Balance Bidirectional**
+   - Each balance is stored unidirectionally
+   - A owes B is separate from B owes A
 
-### Check Constraints
-- `expenses.amount > 0`: Expenses must have positive amounts
-- `expense_splits.amount_owed >= 0`: Split amounts cannot be negative
-- `expense_splits.split_percentage >= 0 AND <= 100`: Percentages must be valid
-- `payments.amount > 0`: Payment amounts must be positive
+3. **Split Validation**
+   - Total of all split amounts must equal expense amount
+   - Validated before creating expense
 
-### Unique Constraints
-- Users have unique email and username
-- Each user can join a group only once
-- Each user has only one split per expense
-- Each group-user pair has only one balance record
-- Payment status tracking prevents duplicate entries
+4. **UserExpenseBalanceSheet**
+   - Cached calculation of all balances
+   - Avoids recalculating on every query
+   - Updated incrementally on each expense
 
----
-
-## Normalization
-
-### First Normal Form (1NF)
-✅ All attributes are atomic (no repeating groups)
-✅ Each table has a primary key
-
-### Second Normal Form (2NF)
-✅ All non-key attributes depend on the entire primary key
-✅ No partial dependencies
-
-### Third Normal Form (3NF)
-✅ No transitive dependencies
-✅ Non-key attributes depend only on the primary key
-
-### Denormalization Decision
-- `USER_BALANCES` table is denormalized for performance
-- Calculated values cached for faster queries
-- Trade-off: Slightly more storage for significant query performance improvement
-
----
-
-## Query Examples
-
-### Find all expenses in a group
-```sql
-SELECT e.*, u.user_name 
-FROM expenses e
-JOIN users u ON e.paid_by_user_id = u.user_id
-WHERE e.group_id = 'G1001'
-ORDER BY e.created_at DESC;
-```
-
-### Get balance between two users
-```sql
-SELECT * FROM user_balances
-WHERE group_id = 'G1001' 
-AND user_id_1 = 'U1001' 
-AND user_id_2 = 'U2001';
-```
-
-### Calculate who owes whom
-```sql
-SELECT 
-    u1.user_name AS payer,
-    u2.user_name AS receiver,
-    ub.amount_owed AS amount
-FROM user_balances ub
-JOIN users u1 ON ub.user_id_1 = u1.user_id
-JOIN users u2 ON ub.user_id_2 = u2.user_id
-WHERE ub.group_id = 'G1001' 
-AND ub.amount_owed > 0;
-```
-
-### Get pending payments
-```sql
-SELECT 
-    u1.user_name AS payer,
-    u2.user_name AS receiver,
-    p.amount,
-    p.created_at
-FROM payments p
-JOIN users u1 ON p.payer_id = u1.user_id
-JOIN users u2 ON p.receiver_id = u2.user_id
-WHERE p.group_id = 'G1001'
-AND p.status = 'PENDING'
-ORDER BY p.created_at DESC;
-```
-
-### Get expense split details
-```sql
-SELECT 
-    e.description,
-    e.amount,
-    u.user_name,
-    es.amount_owed,
-    es.split_percentage
-FROM expenses e
-JOIN expense_splits es ON e.expense_id = es.expense_id
-JOIN users u ON es.user_id = u.user_id
-WHERE e.expense_id = 'Exp1001'
-ORDER BY u.user_name;
-```
-
----
-
-## Indexes for Performance
-
-### Recommended Indexes
-```sql
--- Users table
-CREATE INDEX idx_email ON users(email);
-CREATE INDEX idx_username ON users(user_name);
-
--- Groups table
-CREATE INDEX idx_group_created_by ON groups(created_by);
-CREATE INDEX idx_group_active ON groups(is_active);
-
--- Expenses table
-CREATE INDEX idx_expense_group ON expenses(group_id);
-CREATE INDEX idx_expense_payer ON expenses(paid_by_user_id);
-CREATE INDEX idx_expense_date ON expenses(created_at);
-
--- Group Members table
-CREATE INDEX idx_member_user ON group_members(user_id);
-CREATE INDEX idx_member_active ON group_members(is_active);
-
--- Expense Splits table
-CREATE INDEX idx_split_user ON expense_splits(user_id);
-
--- User Balances table
-CREATE INDEX idx_balance_group ON user_balances(group_id);
-CREATE INDEX idx_balance_user1 ON user_balances(user_id_1);
-CREATE INDEX idx_balance_user2 ON user_balances(user_id_2);
-
--- Payments table
-CREATE INDEX idx_payment_group ON payments(group_id);
-CREATE INDEX idx_payment_payer ON payments(payer_id);
-CREATE INDEX idx_payment_receiver ON payments(receiver_id);
-CREATE INDEX idx_payment_status ON payments(status);
-```
-
----
-
-## Migration Path
-
-### From In-Memory to Database
-
-The current application uses in-memory storage. To migrate to a database:
-
-1. **Phase 1**: Create database schema (scripts provided above)
-2. **Phase 2**: Add data persistence layer (DAOs/Repositories)
-3. **Phase 3**: Implement connection pooling
-4. **Phase 4**: Add transaction management
-5. **Phase 5**: Implement caching layer for performance
-
----
-
-## Scalability Considerations
-
-### Partitioning Strategy
-- Partition `EXPENSES` table by `group_id` for horizontal scaling
-- Partition `PAYMENTS` table by `created_at` for time-series optimization
-
-### Archival Strategy
-- Archive old expenses (> 1 year) to separate tables
-- Keep recent data in main tables for faster queries
-- Maintain denormalized summaries for historical analysis
-
-### Backup Strategy
-- Daily backups for transactional consistency
-- Separate backup for audit trail
-- Point-in-time recovery capability
-
----
-
-## Version History
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0 | March 28, 2026 | Initial schema design |
+5. **Payment Object**
+   - Not persisted in database
+   - Generated on-the-fly for settlements
+   - Used for debt simplification output
 

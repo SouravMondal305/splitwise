@@ -1,422 +1,428 @@
-# Splitwise - Low Level Design
-
-A Java-based expense splitting application that efficiently calculates and settles group expenses with an optimized payment algorithm.
-
-## Features
-
-### Core Functionality
-- **User Management**: Register and manage multiple users
-- **Group Management**: Create groups and add members
-- **Expense Tracking**: Create expenses with various split types
-- **Balance Calculation**: Automatic calculation of who owes whom
-- **Payment Settlement**: Optimized algorithm to determine minimum transactions needed
-
-### Expense Types
-- **GROUP Expenses**: Expenses in a group context (has `group_id`)
-  - Involves multiple group members
-  - Split among all group participants
-  - Example: Hotel booking, Restaurant bill, Tour tickets
-  
-- **DIRECT Expenses**: Peer-to-peer expenses between individuals (group_id is NULL)
-  - Direct settlement between 2-3 users
-  - No group context required
-  - Example: One friend pays for movie tickets, another reimburses
-  - Tracked separately from group expenses
-
-### Split Types
-- **EQUAL**: Split expense equally among all participants
-- **UNEQUAL**: Split expense with custom amounts for each participant
-- **PERCENTAGE**: Split expense based on percentages
-
-### Advanced Features
-- **Dual Expense System**: Support for both group and direct peer-to-peer expenses
-- **Minimal Transaction Algorithm**: Uses a two-pointer matching approach to minimize the number of payment transactions
-- **Group Settlement Summary**: Comprehensive view combining expense summary, member balances, and payment instructions
-- **Direct Expense Tracking**: Independent tracking of peer-to-peer settlements
-- **Individual Balance Sheets**: Detailed breakdown of each user's transactions including group and direct expenses
-
-## Project Structure
-
-```
-splitwise/
-├── src/main/java/org/example/
-│   ├── Main.java                           # Entry point
-│   ├── Splitwise.java                      # Main application (Singleton)
-│   ├── Balance/
-│   │   ├── Balance.java                    # Balance between two users
-│   │   └── UserExpenseBalanceSheet.java    # Overall balance sheet for a user
-│   ├── Controllers/
-│   │   ├── BalanceSheetController.java     # Balance and settlement logic
-│   │   ├── DirectExpenseService.java       # Peer-to-peer expense management
-│   │   ├── ExpenseController.java          # Expense management
-│   │   └── GroupController.java            # Group management
-│   ├── Expense/
-│   │   ├── Expense.java                    # Expense model (supports GROUP and DIRECT)
-│   │   ├── ExpenseType.java                # Enum: GROUP or DIRECT
-│   │   └── ExpenseSplitType.java           # Split type enum (EQUAL, UNEQUAL, PERCENTAGE)
-│   ├── Group/
-│   │   └── Group.java                      # Group model
-│   ├── Payment/
-│   │   └── Payment.java                    # Payment transaction model
-│   ├── Split/
-│   │   ├── Split.java                      # Split detail model
-│   │   ├── ExpenseSplitStrategy.java       # Strategy pattern interface
-│   │   └── SplitStrategies/
-│   │       ├── EqualExpenseSplit.java      # Equal split implementation
-│   │       ├── PercentageExpenseSplit.java # Percentage split implementation
-│   │       └── UnequalExpenseSplit.java    # Unequal split implementation
-│   └── User/
-│       ├── User.java                       # User model
-│       └── UserController.java             # User management
-├── pom.xml                                 # Maven configuration
-└── README.md                               # This file
-```
-
-## Design Patterns Used
-
-### 1. **Singleton Pattern**
-- `Splitwise` class uses thread-safe singleton pattern to ensure only one instance exists
-- Double-checked locking for performance
-
-```java
-public static Splitwise getInstance() {
-    if (instance == null) {
-        synchronized (Splitwise.class) {
-            if (instance == null) {
-                instance = new Splitwise();
-            }
-        }
-    }
-    return instance;
-}
-```
-
-### 2. **Strategy Pattern**
-- `ExpenseSplitStrategy` interface allows different split calculation strategies
-- Implementations: `EqualExpenseSplit`, `PercentageExpenseSplit`, `UnequalExpenseSplit`
-
-### 3. **Controller Pattern**
-- Separation of concerns with dedicated controllers:
-  - `BalanceSheetController`: Balance calculations and settlement
-  - `ExpenseController`: Expense creation and management
-  - `GroupController`: Group operations
-  - `UserController`: User operations
-
-## Payment Settlement Algorithm
-
-### Overview
-The algorithm determines the minimum number of transactions needed to settle all debts in a group using an optimized two-pointer approach.
-
-### Steps
-
-1. **Calculate Net Balance**: For each member, calculate their net balance
-   - Positive balance = money owed to them
-   - Negative balance = money they owe
-
-2. **Separate Debtors and Creditors**:
-   - Debtors: Members with negative balance (those who owe)
-   - Creditors: Members with positive balance (those owed money)
-
-3. **Match Pairs**: Use two pointers to match debtors with creditors
-   - Amount transferred = min(debtor owes, creditor receives)
-   - Move pointers based on remaining amounts
-
-4. **Generate Payments**: Create payment transactions for each match
-
-### Time Complexity
-- **O(n log n)** due to sorting of debtors and creditors
-- **O(n)** for the matching algorithm
-- Overall: **O(n log n)**
-
-### Space Complexity
-- **O(n)** for storing balances and payment list
-
-## Usage
-
-### Running the Demo
-
-```bash
-# Compile the project
-mvn clean compile
-
-# Run the demo
-mvn exec:java -Dexec.mainClass="org.example.Main"
-```
-
-### Example Output
-
-```
-╔════════════════════════════════════════════════════════════════╗
-║           GROUP SETTLEMENT SUMMARY: G1001                      ║
-╚════════════════════════════════════════════════════════════════╝
-
-┌─ EXPENSE SUMMARY ─────────────────────────────────────────────┐
-│ Total Group Expense: ₹1400.00                                  │
-└───────────────────────────────────────────────────────────────┘
-
-┌─ MEMBER BALANCES ─────────────────────────────────────────────┐
-│ Member          Paid           Their Share    Balance          │
-├───────────────────────────────────────────────────────────────┤
-│ U1001           ₹900.00        ₹700.00        Gets ₹200.00     │
-│ U2001           ₹500.00        ₹400.00        Gets ₹100.00     │
-│ U3001           ₹0.00          ₹300.00        Owes ₹300.00     │
-└───────────────────────────────────────────────────────────────┘
-
-┌─ PAYMENT INSTRUCTIONS ────────────────────────────────────────┐
-│ Transaction                                                    │
-├───────────────────────────────────────────────────────────────┤
-│ Alice → Charlie : ₹200.00                                      │
-│ Bob → Charlie : ₹100.00                                        │
-└───────────────────────────────────────────────────────────────┘
-```
-
-## API Reference
-
-### Splitwise (Main Class)
-
-```java
-// Get singleton instance
-Splitwise splitwise = Splitwise.getInstance();
-
-// Run demo
-splitwise.runSplitwiseDemo();
-```
-
-### BalanceSheetController
-
-```java
-// Show individual user balance sheet
-balanceSheetController.showBalanceSheetOfUser(user);
-
-// Show group balance sheet
-balanceSheetController.showGroupBalanceSheet(group);
-
-// Get payment settlement for a group (returns List<Payment>)
-List<Payment> payments = balanceSheetController.getGroupPaymentSettlement(group);
-
-// Display who pays whom (standalone)
-balanceSheetController.showGroupPaymentSettlement(group);
-
-// Display combined settlement summary (balance sheet + payments)
-balanceSheetController.showGroupSettlementSummary(group);
-```
-
-### GroupController
-
-```java
-// Create a new group
-groupController.createNewGroup(groupId, groupName, creator);
-
-// Get existing group
-Group group = groupController.getGroup(groupId);
-```
-
-### Group
-
-```java
-// Add member to group
-group.addMember(user);
-
-// Create expense
-group.createExpense(
-    expenseId,
-    description,
-    amount,
-    splits,
-    splitType,
-    paidByUser
-);
-
-// Get group members
-List<User> members = group.getGroupMembers();
-
-// Get group expenses
-List<Expense> expenses = group.getExpenses();
-```
-
-## Key Classes
-
-### Payment.java
-Represents a single payment transaction between two users.
-
-```java
-Payment payment = new Payment(
-    payerId, payerName,
-    receiverId, receiverName,
-    amount
-);
-```
-
-### Balance.java
-Stores balance information between two users (amount owed and amount to get back).
-
-### UserExpenseBalanceSheet.java
-Maintains comprehensive balance information for a user:
-- Total expenses
-- Total payments made
-- Total amount owed
-- Total amount to get back
-- Per-user balance details
-
-## Example: Creating a Group Expense
-
-```java
-// Create users
-User alice = new User("U1001", "Alice");
-User bob = new User("U2001", "Bob");
-User charlie = new User("U3001", "Charlie");
-
-// Create group
-groupController.createNewGroup("G1001", "Trip", alice);
-Group group = groupController.getGroup("G1001");
-
-// Add members
-group.addMember(bob);
-group.addMember(charlie);
-
-// Create expense (Alice pays ₹900, equally split among 3)
-group.createExpense(
-    "Exp1001",
-    "Dinner",
-    900,
-    List.of(
-        new Split(alice, 300),
-        new Split(bob, 300),
-        new Split(charlie, 300)
-    ),
-    ExpenseSplitType.EQUAL,
-    alice
-);
-
-// Show settlement
-balanceSheetController.showGroupSettlementSummary(group);
-```
-
-## Algorithm Optimization
-
-### Why Two-Pointer Matching?
-
-Traditional approach (everyone pays everyone) creates O(n²) transactions.
-
-Example with 4 people where 3 owe 1 person:
-- **Naive approach**: 3 payments ✓ (optimal)
-- **Two-pointer algorithm**: 3 payments ✓
-
-Example with complex debts:
-- **Naive approach**: Could create unnecessary intermediate transactions
-- **Two-pointer algorithm**: Finds minimal set greedily
-
-The algorithm efficiently matches creditors with debtors to minimize total transactions while settling all debts.
-
-## Future Enhancements
-
-1. **Persistence**: Add database support for storing groups and expenses
-2. **Payment Methods**: Support for different payment methods (UPI, Bank Transfer, etc.)
-3. **Currency Support**: Multi-currency support with exchange rates
-4. **Recurring Expenses**: Support for recurring group expenses
-5. **Notifications**: Alert users when payments are due
-6. **UI**: Web or mobile interface for better user experience
-7. **Analytics**: Insights into spending patterns
-8. **Settle Partial Debts**: Allow users to settle debts partially
-
-## Requirements
-
-- Java 16 or higher
-- Maven 3.9.14 or higher
-
-## Database Design
-
-### Expense Table Structure
-
-The `EXPENSES` table supports both GROUP and DIRECT expenses:
-
-```sql
-CREATE TABLE expenses (
-    expense_id VARCHAR(50) PRIMARY KEY,
-    group_id VARCHAR(50),              -- NULL for DIRECT expenses
-    paid_by_user_id VARCHAR(50) NOT NULL,
-    description VARCHAR(255) NOT NULL,
-    amount DECIMAL(10,2) NOT NULL,
-    expense_type VARCHAR(50),          -- 'GROUP' or 'DIRECT'
-    split_type VARCHAR(50) NOT NULL,   -- 'EQUAL', 'UNEQUAL', 'PERCENTAGE'
-    created_at TIMESTAMP,
-    -- Constraint: GROUP expenses must have group_id, DIRECT expenses must have NULL group_id
-    CHECK ((group_id IS NOT NULL AND expense_type = 'GROUP') OR 
-           (group_id IS NULL AND expense_type = 'DIRECT'))
-);
-```
-
-### Key Design Decisions
-
-1. **Nullable group_id Column**: 
-   - For GROUP expenses: `group_id` is NOT NULL (references `groups.group_id`)
-   - For DIRECT expenses: `group_id` is NULL (peer-to-peer settlement)
-   - CHECK constraint ensures consistency: Either both group_id and expense_type='GROUP' or group_id=NULL and expense_type='DIRECT'
-
-2. **Dual Expense Types**:
-   - GROUP: Member-to-member within a group context
-   - DIRECT: Individual-to-individual without group context
-
-3. **Split Strategy**:
-   - Both types use the same `EXPENSE_SPLITS` table
-   - Splits define who owes what for each expense
-
-### Repository Pattern
-
-The `ExpenseRepository` provides separate methods for managing both expense types:
-
-```java
-// Save GROUP expense (group_id NOT NULL)
-public void saveGroupExpense(Expense expense, String groupId) { ... }
-
-// Save DIRECT expense (group_id NULL)
-public void saveDirectExpense(Expense expense) { ... }
-
-// Query GROUP expenses
-public List<Expense> findByGroupId(String groupId, UserRepository userRepo) { ... }
-
-// Query DIRECT expenses between two users
-public List<Expense> findDirectExpensesBetweenUsers(String userId1, String userId2, UserRepository userRepo) { ... }
-```
-
-## Building
-
-```bash
-# Clean build
-mvn clean build
-
-# Compile only
-mvn compile
-
-# Run tests (if added)
-mvn test
-
-# Create JAR
-mvn package
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is open source and available under the MIT License.
-
-## Author
-
-**Sourav Mondal** - [SouravMondal305](https://github.com/SouravMondal305)
-
-## Acknowledgments
-
-- Design patterns inspired by low-level design best practices
-- Algorithm optimization influenced by greedy algorithm strategies
-- Payment settlement concept based on real-world Splitwise application
+# Splitwise - Low-Level Design (LLD)
+
+## Overview
+
+**Splitwise** is a Java-based expense-sharing application that helps groups and individuals split expenses and manage debts. The system supports multiple ways of splitting expenses (Equal, Percentage, Unequal) and intelligently simplifies circular debts to minimize the number of transactions needed to settle all dues.
+
+### Key Features
+- 👥 **User Management**: Create and manage users
+- 👫 **Group Expenses**: Split expenses among group members with multiple split strategies
+- 🤝 **Direct Expenses**: Peer-to-peer expense settlements between individuals
+- 💰 **Balance Tracking**: Real-time balance sheets for users and groups
+- 🔄 **Debt Simplification**: Automatically detect and eliminate circular debts to reduce transactions
+- 💾 **Database Persistence**: H2 in-memory database for data storage
+- 📊 **Comprehensive Reporting**: Detailed balance summaries and transaction reports
 
 ---
 
-**Last Updated**: March 28, 2026
+## Technology Stack
+
+| Component | Technology |
+|-----------|-----------|
+| **Language** | Java 16 |
+| **Build Tool** | Maven |
+| **Database** | H2 (In-Memory) |
+| **Architecture Pattern** | Model-View-Controller (MVC) with Service Layer |
+| **Design Patterns** | Singleton, Factory, Strategy, Repository |
+
+---
+
+## Architecture Overview
+
+### High-Level Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                          APPLICATION LAYER                      │
+│                                                                  │
+│  ┌──────────────────┐         ┌──────────────────┐              │
+│  │   Main / CLI     │         │  Splitwise       │              │
+│  │   Interface      │────────▶│  (Singleton)     │              │
+│  └──────────────────┘         └──────────────────┘              │
+│                                         │                        │
+├─────────────────────────────────────────┼────────────────────────┤
+│                     CONTROLLER LAYER (Services)                  │
+│                                         │                        │
+│  ┌────────────────────────────────────────────────────┐          │
+│  │  • BalanceSheetController  (Balance Calculation)  │          │
+│  │  • ExpenseController       (Expense Creation)     │          │
+│  │  • GroupController         (Group Management)     │          │
+│  │  • UserController          (User Management)      │          │
+│  │  • DirectExpenseService    (P2P Expenses)        │          │
+│  │  • DebtSimplificationService (Cycle Detection)   │          │
+│  └────────────────────────────────────────────────────┘          │
+│                                         │                        │
+├─────────────────────────────────────────┼────────────────────────┤
+│                      MODEL LAYER (Domain Entities)               │
+│                                         │                        │
+│  ┌──────────┐  ┌────────┐  ┌────────┐  ┌──────────┐             │
+│  │  User    │  │ Group  │  │Expense │  │ Payment  │             │
+│  └──────────┘  └────────┘  └────────┘  └──────────┘             │
+│       │            │           │             │                   │
+│  ┌────┴────┐       │           └─────────────┘                   │
+│  │ Balance │       │                                              │
+│  └─────────┘       │                                              │
+│                    └─────────────┬──────────────┐                │
+│                                  │              │                │
+│                           ┌──────┴───────┐   ┌──┴────────┐      │
+│                           │   Split      │   │ Strategies │     │
+│                           └──────────────┘   └───────────┘      │
+│                                                                  │
+├──────────────────────────────────────────────────────────────────┤
+│                    REPOSITORY LAYER (Data Access)                │
+│                                                                  │
+│  ┌─────────────────────────────────────────────┐                │
+│  │  • UserRepository                           │                │
+│  │  • GroupRepository                          │                │
+│  │  • ExpenseRepository                        │                │
+│  │  • DatabaseConfig (H2 Connection)           │                │
+│  └─────────────────────────────────────────────┘                │
+│                           │                                      │
+├───────────────────────────┼──────────────────────────────────────┤
+│                           ▼                                       │
+│              ┌──────────────────────┐                            │
+│              │   H2 In-Memory DB    │                            │
+│              │   (Data Persistence) │                            │
+│              └──────────────────────┘                            │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Component Responsibilities
+
+### 1. **Entity Layer** (Domain Models)
+
+#### User
+- Represents an individual user in the system
+- Contains user ID, name, and personal expense balance sheet
+- Each user maintains their own `UserExpenseBalanceSheet`
+
+#### Group
+- Represents a collection of users sharing expenses
+- Contains list of members and expenses
+- Manages group-level expense creation
+
+#### Expense
+- Represents a transaction between users
+- Can be either `GROUP` (group context) or `DIRECT` (peer-to-peer)
+- Contains split details and payer information
+- Stores expense type, split type, and description
+
+#### Balance
+- Tracks amount owed and amount to receive between user pairs
+- Part of the balance sheet calculation
+
+#### Split
+- Represents individual portion of an expense
+- Contains user and their share amount
+- Used by various split strategies
+
+#### Payment
+- Represents a simplified transaction (final settlement)
+- Contains payer, receiver, and amount
+- Used in debt simplification output
+
+### 2. **Controller/Service Layer**
+
+#### BalanceSheetController
+- **Responsibility**: Update user balance sheets when expenses are added
+- **Logic**:
+  1. Track who paid the total expense amount
+  2. For each split, update the balance between payer and participant
+  3. Calculate running totals (owe, get back, total paid)
+
+#### ExpenseController
+- **Responsibility**: Create expenses with proper split validation
+- Uses Strategy Pattern to select appropriate split calculation method
+
+#### GroupController
+- **Responsibility**: Manage group creation and retrieval
+- Maintains registry of all groups
+
+#### UserController
+- **Responsibility**: Manage user creation and retrieval
+- Maintains registry of all users
+
+#### DirectExpenseService
+- **Responsibility**: Manage peer-to-peer expenses
+- Validates that direct expenses involve 2-3 people only
+- Updates balance sheets without group context
+
+#### DebtSimplificationService
+- **Responsibility**: Detect and eliminate circular debts
+- Uses DFS (Depth-First Search) to find cycles
+- Reduces debt amounts along cycles by minimum value
+- Returns simplified transaction list
+
+### 3. **Repository Layer** (Data Access)
+
+- **Purpose**: Abstract database operations
+- **Components**:
+  - `UserRepository`: CRUD operations for users
+  - `GroupRepository`: CRUD operations for groups
+  - `ExpenseRepository`: CRUD operations for expenses
+  - `DatabaseConfig`: H2 database initialization
+
+### 4. **Splitwise Singleton**
+- **Central coordinator** managing all controllers and repositories
+- Implements **Singleton Pattern** with double-checked locking
+- Ensures single instance of application throughout runtime
+- Runs both end-to-end demo and debt simplification demo
+
+---
+
+## Key Workflows
+
+### Workflow 1: Creating and Settling Group Expenses
+
+```
+1. Create Group
+   └─→ Add Members
+
+2. Create Expense
+   ├─→ Select Payer (who paid)
+   ├─→ Enter Amount
+   ├─→ Define Splits (how to divide)
+   └─→ Call ExpenseController.createExpense()
+
+3. Update Balance Sheets
+   ├─→ Calculate payer's return amount
+   ├─→ For each participant:
+   │   ├─→ Update their "Amount Owe"
+   │   └─→ Update payer's "Amount Get Back"
+   └─→ Store pairwise balances
+
+4. View Balance Summary
+   └─→ Show who owes whom and how much
+```
+
+### Workflow 2: Direct Peer-to-Peer Expenses
+
+```
+1. Create Direct Expense
+   ├─→ Validate participants (2-3 people)
+   ├─→ Validate split amounts match total
+   └─→ Create Expense with ExpenseType.DIRECT
+
+2. Update Balance Sheets
+   └─→ Same as group expenses (no group context)
+
+3. Create Payment Records
+   └─→ Generate settlement transactions
+```
+
+### Workflow 3: Debt Simplification
+
+```
+1. Collect All Balances
+   └─→ Gather all pairwise debts
+
+2. Convert to Debt Graph
+   └─→ Create directed graph: A → B: amount
+
+3. Find Cycles (DFS)
+   ├─→ Start from each node
+   ├─→ Follow debt path until reaching start node
+   └─→ If cycle found, mark it
+
+4. Eliminate Cycle
+   ├─→ Find minimum debt in cycle
+   ├─→ Reduce all debts by minimum
+   └─→ Remove zero-debt edges
+
+5. Repeat Until No Cycles
+   └─→ Continue until no more cycles found
+
+6. Convert Back to Payments
+   └─→ Output simplified settlement list
+```
+
+---
+
+## Design Patterns Used
+
+| Pattern | Usage | Benefit |
+|---------|-------|---------|
+| **Singleton** | Splitwise class | Single entry point, controlled initialization |
+| **Strategy** | ExpenseSplitStrategy, split types | Flexible split calculation algorithms |
+| **Factory** | Creating expenses, users, groups | Centralized object creation |
+| **Repository** | Data access layer | Decouple business logic from DB operations |
+| **MVC** | Overall architecture | Separation of concerns |
+
+---
+
+## Split Strategies
+
+### 1. Equal Split
+- Divides expense equally among all participants
+- Formula: `amount per person = total_amount / number_of_people`
+
+### 2. Unequal Split
+- Allows specifying exact amount for each participant
+- Each participant gets a custom amount
+
+### 3. Percentage Split
+- Divides expense by percentage
+- Formula: `amount = total_amount * (percentage / 100)`
+
+---
+
+## Debt Simplification Algorithm
+
+### Problem Statement
+When multiple people have complex debts, there can be circular payments that could be simplified or eliminated.
+
+**Example:**
+```
+A owes B: 300
+B owes C: 300  
+C owes A: 300
+→ All can settle with 0 transactions (circular debt)
+```
+
+### Algorithm Steps
+
+1. **Build Debt Graph**
+   - Convert all payment transactions into directed graph
+   - Node = User, Edge = Debt
+
+2. **Find Cycles Using DFS**
+   - For each starting node, traverse following debt paths
+   - If path returns to starting node, a cycle is found
+
+3. **Eliminate Cycle**
+   - Find minimum debt value in the cycle
+   - Subtract minimum from all debts in cycle
+   - Remove zero-debt edges
+
+4. **Repeat**
+   - Continue finding and eliminating cycles until none remain
+
+5. **Return Simplified List**
+   - Convert remaining graph back to payment list
+
+### Time Complexity
+- Building graph: **O(n)** where n = number of transactions
+- Finding cycles: **O(V + E)** where V = users, E = debts
+- Overall: **O(n + V + E)**
+
+### Space Complexity
+- **O(V + E)** for the debt graph
+
+---
+
+## How to Run
+
+### Prerequisites
+- Java 16+
+- Maven
+
+### Build
+```bash
+mvn clean compile
+```
+
+### Run
+```bash
+mvn exec:java -Dexec.mainClass="org.example.Main"
+```
+
+### Output
+The application will display:
+1. ✅ User registration
+2. ✅ Group expense creation
+3. ✅ Direct expense creation
+4. 📊 Balance summaries
+5. 🔄 Debt simplification before/after
+6. 📈 Simplification statistics
+
+---
+
+## Example Scenario
+
+### Setup
+- Users: Alice, Bob, Charlie, Diana, Eve
+- Group: "Europe Trip 2026"
+
+### Transactions
+1. **Alice pays ₹3000** for hotel (split equally 3 ways)
+   - Alice: 0, Bob: -1000, Charlie: -1000
+
+2. **Bob pays ₹1200** for food (split equally 3 ways)
+   - Alice: +400, Bob: 0, Charlie: +400
+
+3. **Charlie pays ₹1700** for tours (unequal split)
+   - Alice: +500, Bob: +600, Charlie: 0
+
+### Final Debts (Before Simplification)
+- Bob → Alice: 600
+- Bob → Charlie: 1000
+- Charlie → Bob: 600
+
+### After Simplification
+- Bob → Charlie: 400 (circular debt eliminated)
+
+---
+
+## File Structure
+
+```
+splitwise/
+├── pom.xml
+└── src/main/java/org/example/
+    ├── Main.java
+    ├── Splitwise.java
+    ├── User/
+    │   ├── User.java
+    │   └── UserController.java
+    ├── Group/
+    │   └── Group.java
+    ├── Expense/
+    │   ├── Expense.java
+    │   ├── ExpenseType.java
+    │   └── ExpenseSplitType.java
+    ├── Balance/
+    │   ├── Balance.java
+    │   └── UserExpenseBalanceSheet.java
+    ├── Split/
+    │   ├── Split.java
+    │   ├── ExpenseSplitStrategy.java
+    │   └── SplitStrategies/
+    │       ├── EqualExpenseSplit.java
+    │       ├── PercentageExpenseSplit.java
+    │       └── UnequalExpenseSplit.java
+    ├── Payment/
+    │   └── Payment.java
+    ├── Controllers/
+    │   ├── BalanceSheetController.java
+    │   ├── ExpenseController.java
+    │   ├── GroupController.java
+    │   ├── DirectExpenseService.java
+    │   └── DebtSimplificationService.java
+    └── Repository/
+        ├── DatabaseConfig.java
+        ├── UserRepository.java
+        ├── GroupRepository.java
+        └── ExpenseRepository.java
+```
+
+---
+
+## Future Enhancements
+
+- [ ] REST API using Spring Boot
+- [ ] User authentication and authorization
+- [ ] Payment settlement tracking
+- [ ] Generate PDF reports
+- [ ] Mobile app support
+- [ ] Real-time notifications
+- [ ] Currency conversion support
+- [ ] Advanced debt optimization algorithms
+
+---
+
+## Contributors
+
+Project created as a comprehensive LLD exercise for learning OOP, design patterns, and system design principles.
+
