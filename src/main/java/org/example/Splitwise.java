@@ -80,8 +80,6 @@ public class Splitwise {
         
         displayGroupBalanceSummary();
         
-        displayGroupExpenseSummary();
-        
         System.out.println("\n╔════════════════════════════════════════════════════════════════╗");
         System.out.println("║               ✅ END-TO-END DEMO COMPLETED                     ║");
         System.out.println("╚════════════════════════════════════════════════════════════════╝\n");
@@ -266,10 +264,5 @@ public class Splitwise {
     private void displayGroupBalanceSummary() {
         Group tripGroup = groupController.getGroup("G1001");
         balanceSheetController.showGroupSettlementSummary(tripGroup);
-    }
-
-    private void displayGroupExpenseSummary() {
-        Group tripGroup = groupController.getGroup("G1001");
-        balanceSheetController.showGroupBalanceSheet(tripGroup);
     }
 }
