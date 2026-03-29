@@ -9,70 +9,65 @@ This document provides comprehensive data modeling information including class h
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
 │                                                                             │
-│                              SPLITWISE ENTITIES                            │
+│                        DATABASE TABLES (H2)                                │
 │                                                                             │
 ├────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  ┌──────────────────┐           ┌───────────────────┐                      │
-│  │      USER        │           │      GROUP        │                      │
+│  │      USERS       │           │     GROUPS        │                      │
 │  ├──────────────────┤           ├───────────────────┤                      │
-│  │ userId (PK)      │           │ groupId (PK)      │                      │
-│  │ userName         │           │ groupName         │                      │
-│  │ balance_sheet    │◄──────────│ createdBy         │                      │
-│  └──────────────────┘           │ members (M:M)     │                      │
-│           │                      │ expenses (1:M)    │                      │
-│           │                      └───────────────────┘                      │
-│           │                             ▲                                   │
+│  │ user_id (PK)     │           │ group_id (PK)     │                      │
+│  │ user_name        │           │ group_name        │                      │
+│  │ email            │◄──────────│ created_by (FK)   │                      │
+│  │ created_at       │           │ created_at        │                      │
+│  └──────────────────┘           └───────────────────┘                      │
+│           ▲                             ▲                                   │
+│           │ (1:M)                       │ (1:M)                             │
 │           │                             │                                   │
-│  ┌────────▼──────────────────────┐     │                                   │
-│  │ USER_EXPENSE_BALANCE_SHEET    │     │                                   │
-│  ├──────────────────────────────┤     │                                   │
-│  │ userId (FK)                   │     │                                   │
-│  │ totalYourExpense              │     │                                   │
-│  │ totalPayment                  │     │                                   │
-│  │ totalYouOwe                   │     │                                   │
-│  │ totalYouGetBack               │     │                                   │
-│  │ userVsBalance (M:1)           │     │                                   │
-│  └───────────────────────────────┘     │                                   │
-│           │                             │                                   │
-│  ┌────────▼──────────────────────┐     │                                   │
-│  │ BALANCE (Pairwise Balance)    │     │                                   │
-│  ├──────────────────────────────┤     │                                   │
-│  │ fromUserId (FK)               │     │                                   │
-│  │ toUserId (FK)                 │     │                                   │
-│  │ amountOwe                     │     │                                   │
-│  │ amountGetBack                 │     │                                   │
-│  └───────────────────────────────┘     │                                   │
-│                                        │                                   │
-│                          ┌─────────────▼──────────────┐                   │
-│                          │      EXPENSE              │                   │
-│                          ├───────────────────────────┤                   │
-│                          │ expenseId (PK)            │                   │
-│                          │ description               │                   │
-│                          │ expenseAmount             │                   │
-│                          │ paidByUser (FK)           │                   │
-│                          │ groupId (FK - nullable)   │                   │
-│                          │ expenseType (GROUP/DIRECT)│                   │
-│                          │ splitType                 │                   │
-│                          │ splitDetails (1:M)        │                   │
-│                          └──────────────┬────────────┘                   │
-│                                         │                                 │
-│                          ┌──────────────▼────────────┐                   │
-│                          │ SPLIT                     │                   │
-│                          ├───────────────────────────┤                   │
-│                          │ expenseId (FK)            │                   │
-│                          │ userId (FK)               │                   │
-│                          │ amountOwe                 │                   │
-│                          └───────────────────────────┘                   │
-│                                         │                                 │
-│                          ┌──────────────▼────────────┐                   │
-│                          │ PAYMENT                   │                   │
-│                          │ (Settlement Transaction) │                   │
-│                          ├───────────────────────────┤                   │
-│                          │ payerId (FK)              │                   │
-│                          │ receiverId (FK)           │                   │
-│                          │ amount                    │                   │
-│                          └───────────────────────────┘                   │
+│  ┌────────┴─────────────┐       ┌───────┴──────────────┐                  │
+│  │  GROUP_MEMBERS       │       │    EXPENSES          │                  │
+│  ├──────────────────────┤       ├──────────────────────┤                  │
+│  │ group_member_id (PK) │       │ expense_id (PK)      │                  │
+│  │ group_id (FK)        │       │ group_id (FK-null)   │                  │
+│  │ user_id (FK)         │       │ paid_by_user_id (FK) │                  │
+│  │ joined_at            │       │ description          │                  │
+│  └──────────────────────┘       │ amount               │                  │
+│                                 │ expense_type        │                  │
+│                                 │ split_type          │                  │
+│                                 │ created_at          │                  │
+│                                 └──────────┬───────────┘                  │
+│                                            │ (1:M)                         │
+│                                 ┌──────────▼──────────┐                   │
+│                                 │ EXPENSE_SPLITS      │                   │
+│                                 ├─────────────────────┤                   │
+│                                 │ split_id (PK)       │                   │
+│                                 │ expense_id (FK)     │                   │
+│                                 │ user_id (FK)        │                   │
+│                                 │ amount_owed         │                   │
+│                                 └─────────────────────┘                   │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────┐           │
+│  │ USER_BALANCES (Pairwise Balance Tracking)                  │           │
+│  ├─────────────────────────────────────────────────────────────┤           │
+│  │ balance_id (PK)                                             │           │
+│  │ group_id (FK - nullable)                                    │           │
+│  │ user_id_1 (FK) → USERS                                      │           │
+│  │ user_id_2 (FK) → USERS                                      │           │
+│  │ amount_owed (user_1 owes user_2)                            │           │
+│  │ amount_to_receive (user_1 receives from user_2)             │           │
+│  └─────────────────────────────────────────────────────────────┘           │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────┐           │
+│  │ PAYMENTS (Settlement Transactions)                          │           │
+│  ├─────────────────────────────────────────────────────────────┤           │
+│  │ payment_id (PK)                                             │           │
+│  │ payer_id (FK) → USERS                                       │           │
+│  │ receiver_id (FK) → USERS                                    │           │
+│  │ group_id (FK - nullable)                                    │           │
+│  │ amount                                                      │           │
+│  │ status (PENDING/COMPLETED)                                  │           │
+│  │ created_at                                                  │           │
+│  └─────────────────────────────────────────────────────────────┘           │
 │                                                                             │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -299,7 +294,9 @@ public class Payment {
 ```sql
 CREATE TABLE USERS (
     user_id VARCHAR(50) PRIMARY KEY,
-    user_name VARCHAR(100) NOT NULL
+    user_name VARCHAR(100) NOT NULL UNIQUE,
+    email VARCHAR(100) UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
@@ -309,6 +306,7 @@ CREATE TABLE GROUPS (
     group_id VARCHAR(50) PRIMARY KEY,
     group_name VARCHAR(100) NOT NULL,
     created_by VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (created_by) REFERENCES USERS(user_id)
 );
 ```
@@ -316,9 +314,11 @@ CREATE TABLE GROUPS (
 ### Table: GROUP_MEMBERS
 ```sql
 CREATE TABLE GROUP_MEMBERS (
+    group_member_id INT PRIMARY KEY AUTO_INCREMENT,
     group_id VARCHAR(50) NOT NULL,
     user_id VARCHAR(50) NOT NULL,
-    PRIMARY KEY (group_id, user_id),
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (group_id, user_id),
     FOREIGN KEY (group_id) REFERENCES GROUPS(group_id),
     FOREIGN KEY (user_id) REFERENCES USERS(user_id)
 );
@@ -328,51 +328,62 @@ CREATE TABLE GROUP_MEMBERS (
 ```sql
 CREATE TABLE EXPENSES (
     expense_id VARCHAR(50) PRIMARY KEY,
-    description VARCHAR(500),
-    expense_amount DOUBLE NOT NULL,
-    paid_by_user VARCHAR(50) NOT NULL,
-    group_id VARCHAR(50),
-    expense_type VARCHAR(20) NOT NULL,  -- 'GROUP' or 'DIRECT'
-    split_type VARCHAR(20) NOT NULL,    -- 'EQUAL', 'UNEQUAL', 'PERCENTAGE'
-    FOREIGN KEY (paid_by_user) REFERENCES USERS(user_id),
-    FOREIGN KEY (group_id) REFERENCES GROUPS(group_id)
+    group_id VARCHAR(50),  -- NULL for direct peer-to-peer expenses
+    paid_by_user_id VARCHAR(50) NOT NULL,
+    description VARCHAR(255) NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    expense_type VARCHAR(50) DEFAULT 'GROUP',  -- 'GROUP' or 'DIRECT'
+    split_type VARCHAR(50) NOT NULL,           -- 'EQUAL', 'UNEQUAL', 'PERCENTAGE'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (group_id) REFERENCES GROUPS(group_id),
+    FOREIGN KEY (paid_by_user_id) REFERENCES USERS(user_id),
+    CHECK ((group_id IS NOT NULL AND expense_type = 'GROUP') OR 
+           (group_id IS NULL AND expense_type = 'DIRECT'))
 );
 ```
 
-### Table: SPLITS
+### Table: EXPENSE_SPLITS
 ```sql
-CREATE TABLE SPLITS (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE EXPENSE_SPLITS (
+    split_id INT PRIMARY KEY AUTO_INCREMENT,
     expense_id VARCHAR(50) NOT NULL,
     user_id VARCHAR(50) NOT NULL,
-    amount_owe DOUBLE NOT NULL,
+    amount_owed DECIMAL(10,2) NOT NULL,
+    UNIQUE (expense_id, user_id),
     FOREIGN KEY (expense_id) REFERENCES EXPENSES(expense_id),
     FOREIGN KEY (user_id) REFERENCES USERS(user_id)
 );
 ```
 
-### Table: BALANCE_SHEETS
+### Table: USER_BALANCES
 ```sql
-CREATE TABLE BALANCE_SHEETS (
-    user_id VARCHAR(50) PRIMARY KEY,
-    total_your_expense DOUBLE,
-    total_payment DOUBLE,
-    total_you_owe DOUBLE,
-    total_you_get_back DOUBLE,
-    FOREIGN KEY (user_id) REFERENCES USERS(user_id)
+CREATE TABLE USER_BALANCES (
+    balance_id INT PRIMARY KEY AUTO_INCREMENT,
+    group_id VARCHAR(50),
+    user_id_1 VARCHAR(50) NOT NULL,
+    user_id_2 VARCHAR(50) NOT NULL,
+    amount_owed DECIMAL(10,2) NOT NULL DEFAULT 0,
+    amount_to_receive DECIMAL(10,2) NOT NULL DEFAULT 0,
+    UNIQUE (group_id, user_id_1, user_id_2),
+    FOREIGN KEY (group_id) REFERENCES GROUPS(group_id),
+    FOREIGN KEY (user_id_1) REFERENCES USERS(user_id),
+    FOREIGN KEY (user_id_2) REFERENCES USERS(user_id)
 );
 ```
 
-### Table: BALANCES
+### Table: PAYMENTS
 ```sql
-CREATE TABLE BALANCES (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id VARCHAR(50) NOT NULL,
-    other_user_id VARCHAR(50) NOT NULL,
-    amount_owe DOUBLE,
-    amount_get_back DOUBLE,
-    FOREIGN KEY (user_id) REFERENCES USERS(user_id),
-    FOREIGN KEY (other_user_id) REFERENCES USERS(user_id)
+CREATE TABLE PAYMENTS (
+    payment_id INT PRIMARY KEY AUTO_INCREMENT,
+    payer_id VARCHAR(50) NOT NULL,
+    receiver_id VARCHAR(50) NOT NULL,
+    group_id VARCHAR(50),
+    amount DECIMAL(10,2) NOT NULL,
+    status VARCHAR(50) DEFAULT 'PENDING',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (payer_id) REFERENCES USERS(user_id),
+    FOREIGN KEY (receiver_id) REFERENCES USERS(user_id),
+    FOREIGN KEY (group_id) REFERENCES GROUPS(group_id)
 );
 ```
 
